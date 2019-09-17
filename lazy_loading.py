@@ -13,7 +13,7 @@ A = view1.dsetread
 % stores view1 of h5py dataset data in the A array
 B = view1[:]
 $ Brackets without lazy_slice call the h5py slicing method, that returns 
-the view1 of h5pt dataset data in the B array
+the view1 of h5py dataset data in the B array
 """
 
 import h5py
