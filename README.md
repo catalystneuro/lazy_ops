@@ -1,4 +1,4 @@
-Provides a class to allow for lazy transposing and slicing operations on h5py datasets
+<strong>Provides a class to allow for lazy transposing and slicing operations on h5py datasets </strong>
 
 Example Usage:
 
