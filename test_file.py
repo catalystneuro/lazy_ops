@@ -55,50 +55,50 @@ def main():
         print("shuffle_e", shuffle_e)
 
         assert (np.sum(
-            np.abs(dsetview[slice_1][slice_2] - dsetview.LazySlice[slice_1].LazySlice[slice_2].dsetread()))) == 0
+            np.abs(dsetview[slice_1][slice_2] - dsetview.lazy_slice[slice_1].lazy_slice[slice_2].dsetread()))) == 0
 
         assert (np.sum(np.abs(
-            dsetview[slice_1][slice_2][slice_3] - dsetview.LazySlice[slice_1].LazySlice[slice_2].LazySlice[
+            dsetview[slice_1][slice_2][slice_3] - dsetview.lazy_slice[slice_1].lazy_slice[slice_2].lazy_slice[
                 slice_3].dsetread()))) == 0
         assert (np.sum(np.abs(
-            dset[slice_1][slice_2][slice_3] - dsetview.LazySlice[slice_1].LazySlice[slice_2].LazySlice[
+            dset[slice_1][slice_2][slice_3] - dsetview.lazy_slice[slice_1].lazy_slice[slice_2].lazy_slice[
                 slice_3].dsetread()))) == 0
 
         assert (np.sum(
-            np.abs(dset[slice_1].transpose() - dsetview.LazySlice[slice_1].lazy_transpose().dsetread()))) == 0
+            np.abs(dset[slice_1].transpose() - dsetview.lazy_slice[slice_1].lazy_transpose().dsetread()))) == 0
 
         assert (np.sum(
-            np.abs(dsetview[slice_1].transpose() - dsetview.LazySlice[slice_1].lazy_transpose().dsetread()))) == 0
+            np.abs(dsetview[slice_1].transpose() - dsetview.lazy_slice[slice_1].lazy_transpose().dsetread()))) == 0
         assert (np.sum(np.abs(dsetview[slice_1].transpose()[slice_2] -
-                              dsetview.LazySlice[slice_1].lazy_transpose().LazySlice[slice_2].dsetread()))) == 0
+                              dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].dsetread()))) == 0
         assert (np.sum(np.abs(dsetview[slice_1].transpose()[slice_2][slice_3] -
-                              dsetview.LazySlice[slice_1].lazy_transpose().LazySlice[slice_2].LazySlice[
+                              dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].lazy_slice[
                                   slice_3].dsetread()))) == 0
 
         assert (np.sum(np.abs(dset[slice_1].transpose()[slice_2][slice_3] -
-                              dsetview.LazySlice[slice_1].lazy_transpose().LazySlice[slice_2].LazySlice[
+                              dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].lazy_slice[
                                   slice_3].dsetread()))) == 0
 
         assert (np.sum(np.abs(dset[slice_1].transpose([2, 0, 1]) -
-                              dsetview.LazySlice[slice_1].lazy_transpose([2, 0, 1]).dsetread()))) == 0
+                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).dsetread()))) == 0
 
         assert (np.sum(np.abs(dsetview[slice_1].transpose([2, 0, 1])[slice_2] -
-                              dsetview.LazySlice[slice_1].lazy_transpose([2, 0, 1]).LazySlice[
+                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[
                                   slice_2].dsetread()))) == 0
 
         assert (np.sum(np.abs(dsetview[slice_1].transpose([2, 0, 1])[slice_2][slice_3] -
-                              dsetview.LazySlice[slice_1].lazy_transpose([2, 0, 1]).LazySlice[slice_2].LazySlice[
+                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[slice_2].lazy_slice[
                                   slice_3].dsetread()))) == 0
 
         assert (np.sum(np.abs(dset[slice_1].transpose([2, 0, 1])[slice_2][slice_3].transpose([1, 2, 0]) -
-                              dsetview.LazySlice[slice_1].lazy_transpose([2, 0, 1]).LazySlice[slice_2].LazySlice[
+                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[slice_2].lazy_slice[
                                   slice_3].lazy_transpose([1, 2, 0]).dsetread()))) == 0
 
         assert (np.sum(np.abs(
             dset[:, :, :].transpose(shuffle_a)[slice_1].transpose(shuffle_b)[slice_2][slice_3].transpose(shuffle_c)[
                 slice_4].transpose() -
-            dsetview.lazy_transpose(shuffle_a).LazySlice[slice_1].transpose(shuffle_b).LazySlice[slice_2].LazySlice[
-                slice_3].lazy_transpose(shuffle_c).LazySlice[slice_4].lazy_transpose().dsetread()))) == 0
+            dsetview.lazy_transpose(shuffle_a).lazy_slice[slice_1].transpose(shuffle_b).lazy_slice[slice_2].lazy_slice[
+                slice_3].lazy_transpose(shuffle_c).lazy_slice[slice_4].lazy_transpose().dsetread()))) == 0
 
 
 if __name__ == "__main__":

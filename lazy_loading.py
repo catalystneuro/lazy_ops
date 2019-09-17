@@ -7,10 +7,10 @@ from lazy_loading import DataSetView
 .
 .
 dsetview = DatasetView(dataset) # dataset is an instantiated h5py dataset
-view1 = dsetview.LazySlice[1:10:2,:,0:50:5].lazy_transpose([2,0,1]).LazySlice[25:55,1,1:4:1,:].transpose()
+view1 = dsetview.lazy_slice[1:10:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice[25:55,1,1:4:1,:].transpose()
 
 A = view1.dsetread  # reads view1 of h5py dataset data
-B = dsetview[:] # Brackets on DataSetView without LazySlice call the h5py slicing method, that returns dataset data
+B = dsetview[:] # Brackets on DataSetView without lazy_slice call the h5py slicing method, that returns dataset data
 """
 
 import h5py
@@ -29,7 +29,7 @@ class DatasetView(h5py._hl.dataset.Dataset):
         """
         self.__slice_key = np.index_exp[:]
         h5py._hl.dataset.Dataset.__init__(self, dataset.id)
-        self.LazySlice = LazySlice(self)
+        self.lazy_slice = LazySlice(self)
 
     def dsetread(self):
         """ Returns the data
@@ -45,15 +45,7 @@ class DatasetView(h5py._hl.dataset.Dataset):
         Returns:
           dataset view object
         """
-        return self.LazySlice.lazy_transpose(axis_order)
-
-        def transpose(self, axis_order = None):
-            """ Same as lazy_transpose() """
-            return self.lazy_transpose(axis_order)
-
-        def T(self, axis_order = None):
-            """ Same as lazy_transpose() """
-            return self.lazy_transpose(axis_order)
+        return self.lazy_slice.lazy_transpose(axis_order)
 
 
 class LazySlice(object):
@@ -72,7 +64,7 @@ class LazySlice(object):
             self._axis_order = axis_order
         self._key = key
         self._dview = dview
-        self.LazySlice = self
+        self.lazy_slice = self
 
     @property
     def dview(self):
@@ -95,12 +87,12 @@ class LazySlice(object):
         Returns:
           lazy object of the view
         """
-        if isinstance(new_slice,slice):
+        if isinstance(new_slice, slice):
             new_slice = new_slice,
         else:
             new_slice = *new_slice,
         self.key_reinit = self.slice_composition(new_slice)
-        return LazySlice(self.dview,self.key_reinit,self.axis_order)
+        return LazySlice(self.dview, self.key_reinit, self.axis_order)
 
     def __call__(self, new_slice):
         """  allows LazySlice function calls with slice objects as input"""
