@@ -47,6 +47,14 @@ class DatasetView(h5py.Dataset):
         """
         return self.lazy_slice.lazy_transpose(axis_order)
 
+    def transpose(self, axis_order=None):
+        """ Same as lazy_transpose() """
+        return self.lazy_transpose(axis_order)
+
+    def T(self, axis_order=None):
+        """ Same as lazy_transpose() """
+        return self.lazy_transpose(axis_order)
+
 
 class LazySlice(object):
     def __init__(self, dview, key=np.index_exp[:], axis_order=None):
