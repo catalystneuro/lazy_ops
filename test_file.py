@@ -1,13 +1,16 @@
+import os
 import h5py
 import numpy as np
 from lazy_loading import DatasetView
 import secrets
 from random import shuffle
+from numpy.testing import assert_array_equal
 
 
 def main():
-    f = h5py.File('testfile.hdf5')  # testfile.hdf5 shape is (10, 100000,30)
-    dset = f['testdataset']
+
+    f = h5py.File('testfile.hdf5')
+    dset = f.create_dataset(name='test_dataset', data=np.random.rand(10, 100000, 30))
     dsetview = DatasetView(dset)
 
     secret_rand = secrets.SystemRandom()
@@ -54,51 +57,46 @@ def main():
         print("shuffle_d", shuffle_d)
         print("shuffle_e", shuffle_e)
 
-        assert (np.sum(
-            np.abs(dsetview[slice_1][slice_2] - dsetview.lazy_slice[slice_1].lazy_slice[slice_2].dsetread()))) == 0
+        assert_array_equal([slice_1][slice_2], dsetview.lazy_slice[slice_1].lazy_slice[slice_2])
 
-        assert (np.sum(np.abs(
-            dsetview[slice_1][slice_2][slice_3] - dsetview.lazy_slice[slice_1].lazy_slice[slice_2].lazy_slice[
-                slice_3].dsetread()))) == 0
-        assert (np.sum(np.abs(
-            dset[slice_1][slice_2][slice_3] - dsetview.lazy_slice[slice_1].lazy_slice[slice_2].lazy_slice[
-                slice_3].dsetread()))) == 0
+        assert_array_equal(dsetview[slice_1][slice_2][slice_3],
+                           dsetview.lazy_slice[slice_1].lazy_slice[slice_2].lazy_slice[slice_3])
 
-        assert (np.sum(
-            np.abs(dset[slice_1].transpose() - dsetview.lazy_slice[slice_1].lazy_transpose().dsetread()))) == 0
+        assert_array_equal(dset[slice_1].transpose(),
+                           dsetview.lazy_slice[slice_1].lazy_transpose())
 
-        assert (np.sum(
-            np.abs(dsetview[slice_1].transpose() - dsetview.lazy_slice[slice_1].lazy_transpose().dsetread()))) == 0
-        assert (np.sum(np.abs(dsetview[slice_1].transpose()[slice_2] -
-                              dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].dsetread()))) == 0
-        assert (np.sum(np.abs(dsetview[slice_1].transpose()[slice_2][slice_3] -
-                              dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].lazy_slice[
-                                  slice_3].dsetread()))) == 0
+        assert_array_equal(dsetview[slice_1].transpose(),
+                           dsetview.lazy_slice[slice_1].lazy_transpose())
 
-        assert (np.sum(np.abs(dset[slice_1].transpose()[slice_2][slice_3] -
-                              dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].lazy_slice[
-                                  slice_3].dsetread()))) == 0
+        assert_array_equal(dsetview[slice_1].transpose()[slice_2],
+                           dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2])
 
-        assert (np.sum(np.abs(dset[slice_1].transpose([2, 0, 1]) -
-                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).dsetread()))) == 0
+        assert_array_equal(dsetview[slice_1].transpose()[slice_2][slice_3],
+                           dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].lazy_slice[slice_3])
 
-        assert (np.sum(np.abs(dsetview[slice_1].transpose([2, 0, 1])[slice_2] -
-                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[
-                                  slice_2].dsetread()))) == 0
+        assert_array_equal(dset[slice_1].transpose()[slice_2][slice_3],
+                           dsetview.lazy_slice[slice_1].lazy_transpose().lazy_slice[slice_2].lazy_slice[slice_3])
 
-        assert (np.sum(np.abs(dsetview[slice_1].transpose([2, 0, 1])[slice_2][slice_3] -
-                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[slice_2].lazy_slice[
-                                  slice_3].dsetread()))) == 0
+        assert_array_equal(dset[slice_1].transpose([2, 0, 1]),
+                           dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]))
 
-        assert (np.sum(np.abs(dset[slice_1].transpose([2, 0, 1])[slice_2][slice_3].transpose([1, 2, 0]) -
-                              dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[slice_2].lazy_slice[
-                                  slice_3].lazy_transpose([1, 2, 0]).dsetread()))) == 0
+        assert_array_equal(dsetview[slice_1].transpose([2, 0, 1])[slice_2],
+                           dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[slice_2])
 
-        assert (np.sum(np.abs(
-            dset[:, :, :].transpose(shuffle_a)[slice_1].transpose(shuffle_b)[slice_2][slice_3].transpose(shuffle_c)[
-                slice_4].transpose() -
-            dsetview.lazy_transpose(shuffle_a).lazy_slice[slice_1].transpose(shuffle_b).lazy_slice[slice_2].lazy_slice[
-                slice_3].lazy_transpose(shuffle_c).lazy_slice[slice_4].lazy_transpose().dsetread()))) == 0
+        assert_array_equal(dsetview[slice_1].transpose([2, 0, 1])[slice_2][slice_3],
+                           dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[slice_2].lazy_slice[slice_3])
+
+        assert_array_equal(dset[slice_1].transpose([2, 0, 1])[slice_2][slice_3].transpose([1, 2, 0]),
+                           dsetview.lazy_slice[slice_1].lazy_transpose([2, 0, 1]).lazy_slice[slice_2].
+                           lazy_slice[slice_3].lazy_transpose([1, 2, 0]))
+
+        assert_array_equal(dset[:, :, :].transpose(shuffle_a)[slice_1].transpose(shuffle_b)[slice_2][slice_3].
+                           transpose(shuffle_c)[slice_4].transpose(),
+                           dsetview.lazy_transpose(shuffle_a).lazy_slice[slice_1].transpose(shuffle_b).
+                           lazy_slice[slice_2].lazy_slice[slice_3].lazy_transpose(shuffle_c).lazy_slice[slice_4].
+                           lazy_transpose())
+
+    os.remove('testfile.hdf5')
 
 
 if __name__ == "__main__":
