@@ -1,7 +1,7 @@
 """Provides a class to allow for lazy transposing and slicing operations on h5py datasets
 
 Example Usage:
-1)
+
 import h5py
 from lazy_loading import DataSetView
 .
@@ -17,10 +17,10 @@ import h5py
 import numpy as np
 
 
-class DatasetView(h5py._hl.dataset.Dataset):
+class DatasetView(h5py.Dataset):
     """ Inherit from this class when implementing dataset views """
 
-    def __init__(self, dataset):
+    def __init__(self, dataset: h5py.Dataset):
         """
         Args:
           dataset: Underlying HDF5 dataset returned from h5py
@@ -28,7 +28,7 @@ class DatasetView(h5py._hl.dataset.Dataset):
           Dataset view object
         """
         self.__slice_key = np.index_exp[:]
-        h5py._hl.dataset.Dataset.__init__(self, dataset.id)
+        h5py.Dataset.__init__(self, dataset.id)
         self.lazy_slice = LazySlice(self)
 
     def dsetread(self):
@@ -122,11 +122,10 @@ class LazySlice(object):
             if i < len(self.key):
                 # converting last stored key slice to regular slices that only contain integers
                 pre_start, pre_stop, pre_step = self.key[i].indices(self.dview.shape[self.axis_order[i]])
-                assert self.dview.shape == (10, 100000, 30)
-                assert pre_start >= 0 and pre_stop >= 0 and pre_step >=1
+                assert pre_start >= 0 and pre_stop >= 0 and pre_step >= 1
                 if pre_stop < pre_start:
                     pre_start = pre_stop
-                pre_shape = 1 + (pre_stop - pre_start -1 )//abs(pre_step) if pre_stop != pre_start else 0 # array dimension after last slice
+                pre_shape = 1 + (pre_stop - pre_start -1 )//abs(pre_step) if pre_stop != pre_start else 0  # array dimension after last slice
 
                 # converting new_slice slice to regular slices that only contain integers
                 newkey_directslice = new_slice[i].indices(pre_shape)
@@ -134,15 +133,15 @@ class LazySlice(object):
                 # newkey_directslice only contains positive or zero integers
                 # regionref requires step>=1 for dataset data calls
                 assert newkey_start >= 0 and newkey_stop >= 0 and newkey_step >=1
-                slice_list.append(slice( pre_start + pre_step * newkey_start, min(pre_start + pre_step * newkey_stop , pre_stop), newkey_step * pre_step))
+                slice_list.append(slice(pre_start + pre_step * newkey_start, min(pre_start + pre_step * newkey_stop , pre_stop), newkey_step * pre_step))
             else:
                 slice_list.append(slice(*new_slice[i].indices(self.dview.shape[self.axis_order[i]])))
-        for i in range(len(new_slice),len(self.key)):
+        for i in range(len(new_slice), len(self.key)):
             slice_list.append(slice(*self.key[i].indices(self.dview.shape[self.axis_order[i]])))
         slice_result = tuple(slice_list)
         return slice_result
 
-    def transpose(self, axis_order = None):
+    def transpose(self, axis_order=None):
         """ Same as lazy_transpose() """
         return self.lazy_transpose(axis_order)
 
