@@ -15,4 +15,4 @@ view1 = dsetviews.lazy_slice[1:10:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice
 
 A = view1.dsetread #returns the data for view1 of h5py dataset
 
-B = dsetviews[:] #Brackets without lazy_slice call the h5py slicing method, that returns the data for view1 of h5py dataset 
+B = dsetviews[:] #Brackets without lazy_slice call the h5py slicing method, that returns the data
