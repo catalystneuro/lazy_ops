@@ -6,7 +6,7 @@ Example Usage:
 
 ```python
 import h5py
-from lazy_loading import DatasetView
+from lazy_ops import DatasetView
 
 dsetview = DatasetView(dataset) # dataset is an instantiated h5py dataset
 view1 = dsetview.LazySlice[1:10:2,:,0:50:5].LazyTranspose([2,0,1]).LazySlice[25:55,1,1:4:1,:].LazyTranspose()

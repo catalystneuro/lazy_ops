@@ -1,13 +1,15 @@
 import os
 import h5py
 import numpy as np
-from lazy_loading import DatasetView
+from lazy_ops import DatasetView
 import secrets
 from random import shuffle
 from numpy.testing import assert_array_equal
 
-def main():
+def test_func():
 
+    if os.path.isfile('testfile.hdf5'):
+      os.remove('testfile.hdf5')
     f = h5py.File('testfile.hdf5')
     ndims = 4
     secret_rand = secrets.SystemRandom()
@@ -19,6 +21,7 @@ def main():
                                 *secret_rand.sample(range(1, dsetview.shape[d] + 1), 1))
 
     for _ in range(200):
+
         slice_list = [randslice(0),
                       np.s_[:],
                       np.index_exp[:],
@@ -78,5 +81,3 @@ def main():
 
     os.remove('testfile.hdf5')
 
-if __name__ == "__main__":
-    main()

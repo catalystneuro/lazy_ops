@@ -1,9 +1,9 @@
 """Provides a class to allow for lazy transposing and slicing operations on h5py datasets
 Example Usage:
 import h5py
-from lazy_loading import DataSetView
-.
-.
+from lazy_ops import DatasetView
+
+
 dsetview = DatasetView(dataset) # dataset is an instantiated h5py dataset
 view1 = dsetview.LazySlice[1:10:2,:,0:50:5].LazyTranspose([2,0,1]).LazySlice[25:55,1,1:4:1,:]
 A = view1[:]          # Brackets on DataSetView call the h5py slicing method, that returns dataset data
@@ -88,7 +88,6 @@ class DatasetView(h5py.Dataset):
         slice_shape = ()
         for i in range(len(slice_)):
             slice_start, slice_stop, slice_step = slice_regindices[i].start, slice_regindices[i].stop, slice_regindices[i].step
-            assert slice_start >= 0 and slice_stop >= 0 and slice_step >= 1
             if slice_step < 1:
                 raise ValueError("Slice step parameter must be positive")
             if slice_stop < slice_start:
@@ -148,13 +147,10 @@ class DatasetView(h5py.Dataset):
                     raise ValueError("Slice step parameter must be positive")
                 if newkey_stop < newkey_start:
                     newkey_start = newkey_stop
-                assert newkey_start >= 0 and newkey_stop >= 0
 
                 slice_result += (slice(min(self.key[i].start + self.key[i].step * newkey_start, self.key[i].stop), 
                                  min(self.key[i].start + self.key[i].step * newkey_stop , self.key[i].stop),
                                  newkey_step * self.key[i].step),)
-                assert (self.key[i].start + self.key[i].step * newkey_start) >=0 and min(self.key[i].start + self.key[i].step * newkey_stop , self.key[i].stop) >=0 and (newkey_step * self.key[i].step) >=1
-                assert min(self.key[i].start + self.key[i].step * newkey_stop , self.key[i].stop) >= min(self.key[i].start + self.key[i].step * newkey_start, self.key[i].stop)
             else:
                 slice_result += (slice(*new_slice[i].indices(self.dataset.shape[self.axis_order[i]])),)
         for i in range(len(new_slice), len(self.key)):
