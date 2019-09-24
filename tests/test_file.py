@@ -36,48 +36,48 @@ def test_func():
         shuffle_list = [list(range(ndims)) for i in range(5)]
         for li in shuffle_list: shuffle(li)
 
-        assert_array_equal(dset[slice_list[1]],  dsetview.LazySlice[slice_list[1]][:])
+        assert_array_equal(dset[slice_list[1]],  dsetview.lazy_slice[slice_list[1]][:])
 
         assert_array_equal(dsetview[slice_list[1]][slice_list[2]],  
-              dsetview.LazySlice[slice_list[1]].LazySlice[slice_list[2]][:])
+              dsetview.lazy_slice[slice_list[1]].lazy_slice[slice_list[2]][:])
 
         assert_array_equal(dsetview[slice_list[1]][slice_list[2]][slice_list[3]], 
-              dsetview.LazySlice[slice_list[1]].LazySlice[slice_list[2]].LazySlice[slice_list[3]][:])
+              dsetview.lazy_slice[slice_list[1]].lazy_slice[slice_list[2]].lazy_slice[slice_list[3]][:])
 
         assert_array_equal(dset[slice_list[1]][slice_list[2]][slice_list[3]],  
-              dsetview.LazySlice[slice_list[1]].LazySlice[slice_list[2]].LazySlice[slice_list[3]][:])
+              dsetview.lazy_slice[slice_list[1]].lazy_slice[slice_list[2]].lazy_slice[slice_list[3]][:])
 
-        assert_array_equal(dset[slice_list[1]].transpose(), dsetview.LazySlice[slice_list[1]].LazyTranspose()[:])
+        assert_array_equal(dset[slice_list[1]].transpose(), dsetview.lazy_slice[slice_list[1]].lazy_transpose()[:])
 
-        assert_array_equal(dsetview[slice_list[1]].transpose(), dsetview.LazySlice[slice_list[1]].LazyTranspose()[:])
+        assert_array_equal(dsetview[slice_list[1]].transpose(), dsetview.lazy_slice[slice_list[1]].lazy_transpose()[:])
 
         assert_array_equal(dsetview[slice_list[1]].transpose()[slice_list[2]], 
-              dsetview.LazySlice[slice_list[1]].LazyTranspose().LazySlice[slice_list[2]][:])
+              dsetview.lazy_slice[slice_list[1]].lazy_transpose().lazy_slice[slice_list[2]][:])
 
         assert_array_equal(dsetview[slice_list[1]].transpose()[slice_list[2]][slice_list[3]], 
-              dsetview.LazySlice[slice_list[1]].LazyTranspose().LazySlice[slice_list[2]].LazySlice[slice_list[3]][:])
+              dsetview.lazy_slice[slice_list[1]].lazy_transpose().lazy_slice[slice_list[2]].lazy_slice[slice_list[3]][:])
 
         assert_array_equal(dset[slice_list[1]].transpose()[slice_list[2]][slice_list[3]], 
-              dsetview.LazySlice[slice_list[1]].LazyTranspose().LazySlice[slice_list[2]].LazySlice[slice_list[3]][:])
+              dsetview.lazy_slice[slice_list[1]].lazy_transpose().lazy_slice[slice_list[2]].lazy_slice[slice_list[3]][:])
 
         assert_array_equal( dsetview[slice_list[1]].transpose(shuffle_list[3])[slice_list[2]][slice_list[3]], 
-              dsetview.LazySlice[slice_list[1]].LazyTranspose(shuffle_list[3]).LazySlice[slice_list[2]].LazySlice[slice_list[3]].dsetread())
+              dsetview.lazy_slice[slice_list[1]].lazy_transpose(shuffle_list[3]).lazy_slice[slice_list[2]].lazy_slice[slice_list[3]].dsetread())
 
         assert_array_equal( dset[slice_list[1]].transpose(shuffle_list[3])[slice_list[2]][slice_list[3]].transpose(shuffle_list[4]),
-             dsetview.LazySlice[slice_list[1]].LazyTranspose(shuffle_list[3]).LazySlice[slice_list[2]]
-             .LazySlice[slice_list[3]].LazyTranspose(shuffle_list[4])[:])
+             dsetview.lazy_slice[slice_list[1]].lazy_transpose(shuffle_list[3]).lazy_slice[slice_list[2]]
+             .lazy_slice[slice_list[3]].lazy_transpose(shuffle_list[4])[:])
 
-        assert_array_equal(dset[:].transpose(shuffle_list[0]), dsetview.LazyTranspose(shuffle_list[0]).dsetread()[:])
+        assert_array_equal(dset[:].transpose(shuffle_list[0]), dsetview.lazy_transpose(shuffle_list[0]).dsetread()[:])
 
         assert_array_equal(dsetview.transpose(shuffle_list[0])[slice_list[1]].transpose(shuffle_list[1])[slice_list[2]][slice_list[3]]
              .transpose(shuffle_list[2])[slice_list[4]].transpose(),
-             dsetview.LazyTranspose(shuffle_list[0]).LazySlice[slice_list[1]].LazyTranspose(shuffle_list[1]).
-             LazySlice[slice_list[2]].LazySlice[slice_list[3]].LazyTranspose(shuffle_list[2]).LazySlice[slice_list[4]].LazyTranspose()[:])
+             dsetview.lazy_transpose(shuffle_list[0]).lazy_slice[slice_list[1]].lazy_transpose(shuffle_list[1]).
+             lazy_slice[slice_list[2]].lazy_slice[slice_list[3]].lazy_transpose(shuffle_list[2]).lazy_slice[slice_list[4]].lazy_transpose()[:])
 
         assert_array_equal(dset[:].transpose(shuffle_list[0])[slice_list[1]].transpose(shuffle_list[1])[slice_list[2]][slice_list[3]].
              transpose(shuffle_list[2])[slice_list[4]].transpose(),
-             dsetview.LazyTranspose(shuffle_list[0]).LazySlice[slice_list[1]].LazyTranspose(shuffle_list[1])
-             .LazySlice[slice_list[2]].LazySlice[slice_list[3]].LazyTranspose(shuffle_list[2]).LazySlice[slice_list[4]].LazyTranspose()[:])
+             dsetview.lazy_transpose(shuffle_list[0]).lazy_slice[slice_list[1]].lazy_transpose(shuffle_list[1])
+             .lazy_slice[slice_list[2]].lazy_slice[slice_list[3]].lazy_transpose(shuffle_list[2]).lazy_slice[slice_list[4]].lazy_transpose()[:])
 
     os.remove('testfile.hdf5')
 

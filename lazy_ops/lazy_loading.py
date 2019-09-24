@@ -5,7 +5,7 @@ from lazy_ops import DatasetView
 
 
 dsetview = DatasetView(dataset) # dataset is an instantiated h5py dataset
-view1 = dsetview.LazySlice[1:10:2,:,0:50:5].LazyTranspose([2,0,1]).LazySlice[25:55,1,1:4:1,:]
+view1 = dsetview.lazy_slice[1:10:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice[25:55,1,1:4:1,:]
 A = view1[:]          # Brackets on DataSetView call the h5py slicing method, that returns dataset data
 B = view1.dsetread()  # same as view1[:]
 
@@ -33,23 +33,23 @@ class DatasetView(h5py.Dataset):
             self._axis_order = axis_order
         self._lazy_slice_call = False
         self._dataset = dataset
-        self._LazyShape, self._key = self._slice_shape(slice_index)
-        self._LazySlice = self
+        self._lazy_shape, self._key = self._slice_shape(slice_index)
+        self._lazy_slice = self
 
     @property
-    def LazySlice(self):
-        ''' Indicator for LazySlice calls '''
+    def lazy_slice(self):
+        ''' Indicator for lazy_slice calls '''
         self._lazy_slice_call = True
-        return self._LazySlice
+        return self._lazy_slice
 
     @property
     def dataset(self):
         return self._dataset
 
     @property
-    def LazyShape(self):
+    def lazy_shape(self):
         """ The shape due to the lazy operations  """
-        return self._LazyShape
+        return self._lazy_shape
 
     @property
     def key(self):
@@ -75,7 +75,7 @@ class DatasetView(h5py.Dataset):
         return key
 
     def _slice_shape(self,slice_):
-        """  For an slice returned by slice_composition function, finds the shape
+        """  For an slice returned by _slice_composition function, finds the shape
         Args:
           slice_: The slice object
         Returns:
@@ -108,13 +108,13 @@ class DatasetView(h5py.Dataset):
         if self._lazy_slice_call:
             self._lazy_slice_call = False
             new_slice = self._slice_tuple(new_slice)
-            self.key_reinit = self.slice_composition(new_slice)
+            self.key_reinit = self._slice_composition(new_slice)
             return DatasetView(self.dataset, self.key_reinit, self.axis_order)
 
         return self.dsetread()[new_slice]
 
     def __call__(self, new_slice):
-        """  allows LazySlice function calls with slice objects as input"""
+        """  allows lazy_slice function calls with slice objects as input"""
         return self.__getitem__(new_slice)
 
     def dsetread(self):
@@ -128,7 +128,7 @@ class DatasetView(h5py.Dataset):
         reversed_slice_key = tuple(self.key[i] for i in self.reversed_axis_order if i < len(self.key))
         return self.dataset[reversed_slice_key].transpose(self.axis_order)
 
-    def slice_composition(self, new_slice):
+    def _slice_composition(self, new_slice):
         """  composes a new_slice with the self.key slice
         Args:
           new_slice: The new slice
@@ -141,7 +141,7 @@ class DatasetView(h5py.Dataset):
             if i < len(self.key):
                 # converting new_slice slice to regular slices,
                 # newkey_start, newkey_stop, newkey_step only contains positive or zero integers
-                newkey_start, newkey_stop, newkey_step = new_slice[i].indices(self.LazyShape[i])
+                newkey_start, newkey_stop, newkey_step = new_slice[i].indices(self.lazy_shape[i])
                 if newkey_step < 1:
                     # regionref requires step>=1 for dataset data calls
                     raise ValueError("Slice step parameter must be positive")
@@ -171,7 +171,7 @@ class DatasetView(h5py.Dataset):
         """ Same as transpose() """
         return self.transpose(axis_order)
 
-    def LazyTranspose(self, axis_order=None):
+    def lazy_transpose(self, axis_order=None):
         """ Array lazy transposition, no axis_order reverses the order of dimensions
         Args:
           axis_order: permutation order for transpose
