@@ -14,9 +14,10 @@ B = view1.dsetread()  # same as view1[:]
 import h5py
 import numpy as np
 
+
 class DatasetView(h5py.Dataset):
 
-    def __init__(self, dataset : h5py.Dataset = None, slice_index=np.index_exp[:], axis_order=None):
+    def __init__(self, dataset: h5py.Dataset = None, slice_index=np.index_exp[:], axis_order=None):
         """
         Args:
           dataset:    the underlying dataset
@@ -74,7 +75,7 @@ class DatasetView(h5py.Dataset):
 
         return key
 
-    def _slice_shape(self,slice_):
+    def _slice_shape(self, slice_):
         """  For an slice returned by _slice_composition function, finds the shape
         Args:
           slice_: The slice object
