@@ -51,6 +51,9 @@ class DatasetView(h5py.Dataset):
     def shape(self):
         return self._lazy_shape
 
+    def __len__(self):
+        return self._lazy_shape[0]
+
     @property
     def key(self):
         """ The self.key slice is passed to the lazy instance and is not altered by the instance's init call """
