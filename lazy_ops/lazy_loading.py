@@ -48,8 +48,7 @@ class DatasetView(h5py.Dataset):
         return self._dataset
 
     @property
-    def lazy_shape(self):
-        """ The shape due to the lazy operations  """
+    def shape(self):
         return self._lazy_shape
 
     @property
@@ -142,7 +141,7 @@ class DatasetView(h5py.Dataset):
             if i < len(self.key):
                 # converting new_slice slice to regular slices,
                 # newkey_start, newkey_stop, newkey_step only contains positive or zero integers
-                newkey_start, newkey_stop, newkey_step = new_slice[i].indices(self.lazy_shape[i])
+                newkey_start, newkey_stop, newkey_step = new_slice[i].indices(self._lazy_shape[i])
                 if newkey_step < 1:
                     # regionref requires step>=1 for dataset data calls
                     raise ValueError("Slice step parameter must be positive")
@@ -150,7 +149,7 @@ class DatasetView(h5py.Dataset):
                     newkey_start = newkey_stop
 
                 slice_result += (slice(min(self.key[i].start + self.key[i].step * newkey_start, self.key[i].stop), 
-                                 min(self.key[i].start + self.key[i].step * newkey_stop , self.key[i].stop),
+                                 min(self.key[i].start + self.key[i].step * newkey_stop, self.key[i].stop),
                                  newkey_step * self.key[i].step),)
             else:
                 slice_result += (slice(*new_slice[i].indices(self.dataset.shape[self.axis_order[i]])),)
