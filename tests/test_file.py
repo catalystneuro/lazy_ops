@@ -26,11 +26,11 @@ def test_func():
         slice_list = [randslice(0),
                       np.s_[:],
                       np.index_exp[:],
-                      tuple(randslice(i) for i in range(len(dsetview.shape))),
-                      tuple(randslice(i) for i in range(len(dsetview.shape))),
-                      tuple(randslice(i) for i in range(len(dsetview.shape))),
-                      tuple(randslice(i) for i in range(len(dsetview.shape))),
-                      tuple(randslice(i) for i in range(len(dsetview.shape)))]
+                      tuple(randslice(i) for i in range(secrets.randbelow(len(dsetview.shape)+1))),
+                      tuple(randslice(i) for i in range(secrets.randbelow(len(dsetview.shape)+1))),
+                      tuple(randslice(i) for i in range(secrets.randbelow(len(dsetview.shape)+1))),
+                      tuple(randslice(i) for i in range(secrets.randbelow(len(dsetview.shape)+1))),
+                      tuple(randslice(i) for i in range(secrets.randbelow(len(dsetview.shape)+1)))]
 
         slice_list = [secrets.choice(slice_list) for _ in range(5)]
 
@@ -38,7 +38,8 @@ def test_func():
         for li in shuffle_list:
             shuffle(li)
 
-        assert_array_equal(dset[slice_list[1]],  dsetview.lazy_slice[slice_list[1]][:])
+        assert_array_equal(dset[slice_list[1]],
+                           dsetview.lazy_slice[slice_list[1]][:])
 
         assert_array_equal(dsetview[slice_list[1]][slice_list[2]],
                            dsetview.lazy_slice[slice_list[1]].lazy_slice[slice_list[2]][:])
@@ -89,4 +90,6 @@ def test_func():
                            lazy_transpose(shuffle_list[2]).lazy_slice[slice_list[4]].lazy_transpose()[:])
 
     os.remove('testfile.hdf5')
+
+
 

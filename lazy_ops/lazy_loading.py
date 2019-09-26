@@ -97,7 +97,7 @@ class DatasetView(h5py.Dataset):
                 slice_start = slice_stop
                 slice_regindices[i] = slice(slice_start, slice_stop, slice_step)
             slice_shape += (1 + (slice_stop - slice_start -1 )//slice_step if slice_stop != slice_start else 0,)
-
+        slice_shape += self.dataset.shape[len(slice_)::]
         slice_regindices = tuple(slice_regindices)
         return slice_shape, slice_regindices
 
@@ -111,8 +111,8 @@ class DatasetView(h5py.Dataset):
         if self._lazy_slice_call:
             self._lazy_slice_call = False
             new_slice = self._slice_tuple(new_slice)
-            self.key_reinit = self._slice_composition(new_slice)
-            return DatasetView(self.dataset, self.key_reinit, self.axis_order)
+            key_reinit = self._slice_composition(new_slice)
+            return DatasetView(self.dataset, key_reinit, self.axis_order)
 
         return self.dsetread()[new_slice]
 
@@ -127,8 +127,8 @@ class DatasetView(h5py.Dataset):
         """
         # Note: Directly calling regionref with slices with a zero dimension does not
         # retain shape information of the other dimensions
-        self.reversed_axis_order = sorted(range(len(self.axis_order)), key=lambda i: self.axis_order[i])
-        reversed_slice_key = tuple(self.key[i] for i in self.reversed_axis_order if i < len(self.key))
+        reversed_axis_order = sorted(range(len(self.axis_order)), key=lambda i: self.axis_order[i])
+        reversed_slice_key = tuple(self.key[i] for i in reversed_axis_order if i < len(self.key))
         return self.dataset[reversed_slice_key].transpose(self.axis_order)
 
     def _slice_composition(self, new_slice):
@@ -185,8 +185,11 @@ class DatasetView(h5py.Dataset):
         if axis_order is None:
             axis_order = list(reversed(range(len(self.axis_order))))
 
-        self.key_reinit = [self.key[i] if i < len(self.key) else np.s_[:] for i in axis_order]
+        key_reinit = [self.key[i] if i < len(self.key) else np.s_[:] for i in axis_order]
+        key_reinit.extend(self.key[len(axis_order)::])
 
         axis_order_reinit = [self.axis_order[i] if i < len(self.axis_order) else i for i in axis_order]
-        return DatasetView(self.dataset, self.key_reinit, axis_order_reinit)
+        axis_order_reinit.extend(self.axis_order[len(axis_order)::])
+
+        return DatasetView(self.dataset, key_reinit, axis_order_reinit)
 
