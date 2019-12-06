@@ -108,13 +108,13 @@ class DatasetView(h5py.Dataset):
         Returns:
           lazy object of the view
         """
+        new_slice = self._slice_tuple(new_slice)
+        key_reinit = self._slice_composition(new_slice)
         if self._lazy_slice_call:
             self._lazy_slice_call = False
-            new_slice = self._slice_tuple(new_slice)
-            key_reinit = self._slice_composition(new_slice)
             return DatasetView(self.dataset, key_reinit, self.axis_order)
 
-        return self.dsetread()[new_slice]
+        return DatasetView(self.dataset, key_reinit, self.axis_order).dsetread()
 
     def __call__(self, new_slice):
         """  allows lazy_slice function calls with slice objects as input"""
