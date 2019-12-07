@@ -161,18 +161,9 @@ class DatasetView(h5py.Dataset):
 
         return slice_result
 
-    def transpose(self, axis_order=None):
-        """ Returns the transposed data
-        Args:
-          axis_order: permutation order for data transpose
-        Returns:
-          numpy array
-        """
-        return self.dsetread().transpose(axis_order)
-
     def T(self, axis_order=None):
-        """ Same as transpose() """
-        return self.transpose(axis_order)
+        """ Same as lazy_transpose() """
+        return self.lazy_transpose(axis_order)
 
     def lazy_transpose(self, axis_order=None):
         """ Array lazy transposition, no axis_order reverses the order of dimensions
