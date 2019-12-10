@@ -35,13 +35,12 @@ class DatasetView(h5py.Dataset):
         self._lazy_slice_call = False
         self._dataset = dataset
         self._lazy_shape, self._key = self._slice_shape(slice_index)
-        self._lazy_slice = self
 
     @property
     def lazy_slice(self):
         ''' Indicator for lazy_slice calls '''
         self._lazy_slice_call = True
-        return self._lazy_slice
+        return self
 
     @property
     def dataset(self):
@@ -161,9 +160,10 @@ class DatasetView(h5py.Dataset):
 
         return slice_result
 
-    def T(self, axis_order=None):
+    @property
+    def T(self):
         """ Same as lazy_transpose() """
-        return self.lazy_transpose(axis_order)
+        return self.lazy_transpose()
 
     def lazy_transpose(self, axis_order=None):
         """ Array lazy transposition, no axis_order reverses the order of dimensions
