@@ -107,7 +107,6 @@ class DatasetView(h5py.Dataset):
         Returns:
           lazy object of the view
         """
-        new_slice = self._slice_tuple(new_slice)
         key_reinit = self._slice_composition(new_slice)
         if self._lazy_slice_call:
             self._lazy_slice_call = False
@@ -137,6 +136,7 @@ class DatasetView(h5py.Dataset):
         Returns:
           merged slice object
         """
+        new_slice = self._slice_tuple(new_slice)
         slice_result = ()
         # Iterating over the new slicing tuple to change the merged dataset slice.
         for i in range(len(new_slice)):
@@ -176,11 +176,44 @@ class DatasetView(h5py.Dataset):
         if axis_order is None:
             axis_order = list(reversed(range(len(self.axis_order))))
 
-        key_reinit = [self.key[i] if i < len(self.key) else np.s_[:] for i in axis_order]
-        key_reinit.extend(self.key[len(axis_order)::])
-
         axis_order_reinit = [self.axis_order[i] if i < len(self.axis_order) else i for i in axis_order]
-        axis_order_reinit.extend(self.axis_order[len(axis_order)::])
+        key_reinit = [self.key[i] if i < len(self.key) else np.s_[:] for i in axis_order]
+        key_reinit.extend([self.key[i] for i in self.axis_order if i not in axis_order_reinit])
+        axis_order_reinit.extend([i for i in self.axis_order if i not in axis_order_reinit])
 
         return DatasetView(self.dataset, key_reinit, axis_order_reinit)
+
+    def read_direct(self, dest, source_sel=None, dest_sel=None):
+        """ Using dataset.read_direct, reads data into an existing array
+        Args:
+          dest: C-contiguous as required by Dataset.read_direct
+          source_sel: new selection slice
+          dest_sel: output selection slice
+        Returns:
+          numpy array
+        """
+        if source_sel is None:
+            new_key = self.key
+        else:
+            key_reinit = self._slice_composition(source_sel)
+            _, new_key = self._slice_shape(key_reinit)
+        reversed_axis_order = sorted(range(len(self.axis_order)), key=lambda i: self.axis_order[i])
+        reversed_slice_key = tuple(new_key[i] for i in reversed_axis_order if i < len(new_key))
+        #convert reversed_slice_key to numpy.s_[<args>] format, expected by dataset.read_direct
+        if len(reversed_slice_key) == 1:
+            reversed_slice_key = reversed_slice_key[0]
+
+        reversed_dest_shape = tuple(dest.shape[i] for i in reversed_axis_order if i < len(dest.shape))
+        reversed_dest = np.empty(shape=reversed_dest_shape, dtype=dest.dtype)
+
+        if dest_sel is None:
+            reversed_dest_sel = dest_sel
+        else:
+            reversed_dest_sel = tuple(dest_sel[i] for i in reversed_axis_order if i < len(dest_sel))
+            #convert reversed_dest_sel to numpy.s_[<args>] format, expected by dataset.read_direct
+            if len(reversed_slice_key) == 1:
+                reversed_slice_key = reversed_slice_key[0]
+
+        self.dataset.read_direct(reversed_dest, source_sel=reversed_slice_key, dest_sel=reversed_dest_sel)
+        np.copyto(dest, reversed_dest.transpose(self.axis_order))
 
