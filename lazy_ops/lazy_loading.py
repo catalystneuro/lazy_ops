@@ -38,7 +38,7 @@ class DatasetView(h5py.Dataset):
 
     @property
     def lazy_slice(self):
-        ''' Indicator for lazy_slice calls '''
+        """ Indicator for lazy_slice calls """
         self._lazy_slice_call = True
         return self
 
@@ -66,13 +66,13 @@ class DatasetView(h5py.Dataset):
         return self._axis_order
 
     def _slice_tuple(self, key):
-        """  Allows single slice function calls
+        """  Allows single slice and int function calls
         Args:
-          key: The slice object
+          key: A slice object, or int
         Returns:
           The slice object tuple
         """
-        if isinstance(key, slice):
+        if isinstance(key, (slice,int)):
             key = key,
         else:
             key = *key,
@@ -89,16 +89,23 @@ class DatasetView(h5py.Dataset):
         """
         slice_ = self._slice_tuple(slice_)
         # converting the slice to regular slices that only contain integers
-        slice_regindices = [slice(*slice_[i].indices(self.dataset.shape[self.axis_order[i]])) for i in range(len(slice_))]
+        
+        slice_regindices = [slice(*slice_[i].indices(self.dataset.shape[self.axis_order[i]])) if isinstance(slice_[i],slice)
+                            else slice_[i]
+                            for i in range(len(slice_))]
         slice_shape = ()
         for i in range(len(slice_)):
-            slice_start, slice_stop, slice_step = slice_regindices[i].start, slice_regindices[i].stop, slice_regindices[i].step
-            if slice_step < 1:
-                raise ValueError("Slice step parameter must be positive")
-            if slice_stop < slice_start:
-                slice_start = slice_stop
-                slice_regindices[i] = slice(slice_start, slice_stop, slice_step)
-            slice_shape += (1 + (slice_stop - slice_start -1 )//slice_step if slice_stop != slice_start else 0,)
+            if isinstance(slice_[i],slice):
+                slice_start, slice_stop, slice_step = slice_regindices[i].start, slice_regindices[i].stop, slice_regindices[i].step
+                if slice_step < 1:
+                    raise ValueError("Slice step parameter must be positive")
+                if slice_stop < slice_start:
+                    slice_start = slice_stop
+                    slice_regindices[i] = slice(slice_start, slice_stop, slice_step)
+                slice_shape += (1 + (slice_stop - slice_start -1 )//slice_step if slice_stop != slice_start else 0,)
+            else:
+                # slice_[i] is an iterator of integers
+                slice_shape += (len(slice_[i]),)
         slice_shape += self.dataset.shape[len(slice_)::]
         slice_regindices = tuple(slice_regindices)
         return slice_shape, slice_regindices
@@ -116,21 +123,6 @@ class DatasetView(h5py.Dataset):
             return DatasetView(self.dataset, key_reinit, self.axis_order)
 
         return DatasetView(self.dataset, key_reinit, self.axis_order).dsetread()
-
-    def __getitem__(self, new_slice):
-        """  supports python's colon slicing syntax 
-        Args:
-          new_slice:  the new slice to compose with the lazy instance's self.key slice
-        Returns:
-          lazy object of the view
-        """
-        key_reinit = self._slice_composition(new_slice)
-        if self._lazy_slice_call:
-            self._lazy_slice_call = False
-            return DatasetView(self.dataset, key_reinit, self.axis_order)
-
-        return DatasetView(self.dataset, key_reinit, self.axis_order).dsetread()
-
 
     def __call__(self, new_slice):
         """  allows lazy_slice function calls with slice objects as input"""
@@ -159,24 +151,56 @@ class DatasetView(h5py.Dataset):
         slice_result = ()
         # Iterating over the new slicing tuple to change the merged dataset slice.
         for i in range(len(new_slice)):
-            if i < len(self.key):
-                # converting new_slice slice to regular slices,
-                # newkey_start, newkey_stop, newkey_step only contains positive or zero integers
-                newkey_start, newkey_stop, newkey_step = new_slice[i].indices(self._lazy_shape[i])
-                if newkey_step < 1:
-                    # regionref requires step>=1 for dataset data calls
-                    raise ValueError("Slice step parameter must be positive")
-                if newkey_stop < newkey_start:
-                    newkey_start = newkey_stop
-
-                slice_result += (slice(min(self.key[i].start + self.key[i].step * newkey_start, self.key[i].stop),
-                                 min(self.key[i].start + self.key[i].step * newkey_stop, self.key[i].stop),
-                                 newkey_step * self.key[i].step),)
+            if isinstance(new_slice[i],slice):
+                if i < len(self.key):
+                    # converting new_slice slice to regular slices,
+                    # newkey_start, newkey_stop, newkey_step only contains positive or zero integers
+                    newkey_start, newkey_stop, newkey_step = new_slice[i].indices(self._lazy_shape[i])
+                    if newkey_step < 1:
+                        # regionref requires step>=1 for dataset data calls
+                        raise ValueError("Slice step parameter must be positive")
+                    if newkey_stop < newkey_start:
+                        newkey_start = newkey_stop
+                    if isinstance(self.key[i],slice):
+                        slice_result += (slice(min(self.key[i].start + self.key[i].step * newkey_start, self.key[i].stop),
+                                         min(self.key[i].start + self.key[i].step * newkey_stop, self.key[i].stop),
+                                         newkey_step * self.key[i].step),)
+                    else:
+                        # self.key[i] is an iterator of integers
+                        slice_result += self.key[i][new_slice[i]]
+                else:
+                    slice_result += (slice(*new_slice[i].indices(self.dataset.shape[self.axis_order[i]])),)
+            elif isinstance(new_slice[i],int):
+                if i < len(self.key):
+                    if new_slice[i] >= self._lazy_shape[i] or new_slice[i] <= ~self._lazy_shape[i]:
+                        raise IndexError("Index %d out of range, dim %d of size %d" % (new_slice[i],i,self._lazy_shape[i]))
+                    if isinstance(self.key[i],slice):
+                        int_index = self.key[i].start + self.key[i].step*(new_slice[i]%self._lazy_shape[i])
+                        slice_result += (slice(*slice(int_index,int_index+1 or None, None
+                                                      ).indices(self.dataset.shape[self.axis_order[i]])),)
+                    else:
+                        # self.key[i] is an iterator of integers
+                        slice_result += (slice(*slice(self.key[i][new_slice[i]],self.key[i][new_slice[i]]+1 or None, None
+                                                      ).indices(self.dataset.shape[self.axis_order[i]])),)
+                else:
+                    slice_result += (slice(*slice(new_slice[i],new_slice[i]+1 or None, None).indices(self.dataset.shape[self.axis_order[i]])),)
             else:
-                slice_result += (slice(*new_slice[i].indices(self.dataset.shape[self.axis_order[i]])),)
-        for i in range(len(new_slice), len(self.key)):
-            slice_result += (slice(*self.key[i].indices(self.dataset.shape[self.axis_order[i]])),)
-
+                try:
+                    if any(not isinstance(el,int) for el in new_slice[i]):
+                        raise ValueError("Indices must be integers")
+                    if i < len(self.key):
+                        if any(el >= self._lazy_shape[i] or el <= ~self._lazy_shape[i] for el in new_slice[i]):
+                            raise IndexError("Index %d out of range, dim %d of size %d" % (str(new_slice[i]),i,self._lazy_shape[i]))
+                        if isinstance(self.key[i],slice):
+                            slice_result += (tuple(self.key[i].start + self.key[i].step*(ind%self._lazy_shape[i]) for ind in new_slice[i]),)
+                        else:
+                            # self.key[i] is an iterator of integers
+                            slice_result += (tuple(self.key[i][ind] for ind in new_slice[i]),)
+                    else:
+                        slice_result += (new_slice[i],)
+                except:
+                    raise IndexError("Indices must be either integers, iterators of integers, or slice objects")
+        slice_result += self.key[len(new_slice):len(self.key)]
         return slice_result
 
     @property
