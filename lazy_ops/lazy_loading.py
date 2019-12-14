@@ -13,7 +13,7 @@ B = view1.dsetread()  # same as view1[:]
 
 import h5py
 import numpy as np
-
+import sys
 
 class DatasetView(h5py.Dataset):
 
@@ -51,6 +51,9 @@ class DatasetView(h5py.Dataset):
         return self._lazy_shape
 
     def __len__(self):
+        return self.len()
+
+    def len(self):
         return self._lazy_shape[0]
 
     @property
@@ -114,6 +117,21 @@ class DatasetView(h5py.Dataset):
 
         return DatasetView(self.dataset, key_reinit, self.axis_order).dsetread()
 
+    def __getitem__(self, new_slice):
+        """  supports python's colon slicing syntax 
+        Args:
+          new_slice:  the new slice to compose with the lazy instance's self.key slice
+        Returns:
+          lazy object of the view
+        """
+        key_reinit = self._slice_composition(new_slice)
+        if self._lazy_slice_call:
+            self._lazy_slice_call = False
+            return DatasetView(self.dataset, key_reinit, self.axis_order)
+
+        return DatasetView(self.dataset, key_reinit, self.axis_order).dsetread()
+
+
     def __call__(self, new_slice):
         """  allows lazy_slice function calls with slice objects as input"""
         return self.__getitem__(new_slice)
@@ -137,6 +155,7 @@ class DatasetView(h5py.Dataset):
           merged slice object
         """
         new_slice = self._slice_tuple(new_slice)
+        new_slice = self._ellipsis_slices(new_slice)
         slice_result = ()
         # Iterating over the new slicing tuple to change the merged dataset slice.
         for i in range(len(new_slice)):
@@ -150,7 +169,7 @@ class DatasetView(h5py.Dataset):
                 if newkey_stop < newkey_start:
                     newkey_start = newkey_stop
 
-                slice_result += (slice(min(self.key[i].start + self.key[i].step * newkey_start, self.key[i].stop), 
+                slice_result += (slice(min(self.key[i].start + self.key[i].step * newkey_start, self.key[i].stop),
                                  min(self.key[i].start + self.key[i].step * newkey_stop, self.key[i].stop),
                                  newkey_step * self.key[i].step),)
             else:
@@ -217,3 +236,21 @@ class DatasetView(h5py.Dataset):
         self.dataset.read_direct(reversed_dest, source_sel=reversed_slice_key, dest_sel=reversed_dest_sel)
         np.copyto(dest, reversed_dest.transpose(self.axis_order))
 
+    def _ellipsis_slices(self, new_slice):
+        """ Change Ellipsis dimensions to slices
+        Args:
+          new_slice: The new slice
+        Returns:
+          equivalent slices with Ellipsis expanded
+        """
+        ellipsis_count = new_slice.count(Ellipsis)
+        if ellipsis_count == 1:
+            ellipsis_index = new_slice.index(Ellipsis)
+            if ellipsis_index == len(new_slice)-1:
+                new_slice = new_slice[:-1]
+            else:
+                num_ellipsis_dims = len(self.dataset.shape) - (len(new_slice) - 1)
+                new_slice = new_slice[:ellipsis_index] + np.index_exp[:]*num_ellipsis_dims + new_slice[ellipsis_index+1:]
+        elif ellipsis_count > 0:
+            raise IndexError("Only a single Ellipsis is allowed")
+        return new_slice
