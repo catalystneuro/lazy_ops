@@ -133,12 +133,12 @@ class DatasetView(h5py.Dataset):
             return DatasetView(self.dataset, (key_reinit, self._int_index), self.axis_order)
         return DatasetView(self.dataset, (key_reinit, self._int_index), self.axis_order).dsetread()
 
-    def __iter__(self):
+    def lazy_iter(self, axis=0):
         """ lazy iterator over the first axis
             Modifications to the items are not stored
         """
-        for i in range(self._shape[0]):
-            yield self.lazy_slice[i]
+        for i in range(self._shape[axis]):
+            yield self.lazy_slice[(*np.index_exp[:]*axis,i)]
 
     def __call__(self, new_slice):
         """  allows lazy_slice function calls with slice objects as input"""
