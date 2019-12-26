@@ -1,6 +1,6 @@
 # lazy_ops
 
-<strong>Provides a class to allow for lazy transposing and slicing operations on h5py datasets </strong>
+<strong>Provides a class to allow for lazy transposing, slicing, and iterating operations on h5py datasets </strong>
 
 ## Installation
 
@@ -19,6 +19,9 @@ view1 = dsetview.lazy_slice[1:10:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice[
 
 A = view1[:]          # Brackets on DataSetView call the h5py slicing method, that returns the data
 B = view1.dsetread()  # same as view1[:]
+
+for ib in view1.lazy_iter(axis=1):
+    print(ib[0])
 
 ```
 
