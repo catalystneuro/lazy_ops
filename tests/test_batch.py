@@ -122,6 +122,14 @@ def main():
                     try:
                         assert_array_equal(eval_string_dset,eval(string_dsetview+'[()]'))
                     except Exception as e:
+                        print(slice_at_index,array_at_index)
+                        print(str_key)
+                        print(shuffle_list)
+                        print(slice_list)
+                        print(dset.shape)
+                        print(dsetview.shape)
+                        print(string_dset)
+                        print(string_dsetview)
                         raise e
                     if valid_iter:
                         try:
@@ -135,6 +143,14 @@ def main():
                                     assert_array_equal(eval_string_dset[(*np.index_exp[:]*axis,i)],dsetview_lazy_i)
                                     i += 1
                         except Exception as e:
+                            print(slice_at_index,array_at_index)
+                            print(str_key)
+                            print(shuffle_list)
+                            print(slice_list)
+                            print(dset.shape)
+                            print(dsetview.shape)
+                            print(string_dset)
+                            print(string_dsetview)
                             raise e
 
     os.remove('testfile.hdf5')
