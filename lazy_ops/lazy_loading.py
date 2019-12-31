@@ -310,3 +310,16 @@ class DatasetView(h5py.Dataset):
         elif ellipsis_count > 0:
             raise IndexError("Only a single Ellipsis is allowed")
         return new_slice
+
+def lazy_transpose(dset: h5py.Dataset, axes=None):
+    """ Array lazy transposition, not passing axis argument reverses the order of dimensions
+    Args:
+      dset: h5py dataset
+      axes: permutation order for transpose
+    Returns:
+      lazy transposed DatasetView object
+    """
+    if axes is None:
+        axes = tuple(reversed(range(len(dset.shape))))
+    
+    return DatasetView(dset).lazy_transpose(axis_order=axes)
