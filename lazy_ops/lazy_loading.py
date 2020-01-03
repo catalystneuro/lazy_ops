@@ -13,15 +13,15 @@ B = view1.dsetread()  # same as view1[:]
 
 import h5py
 import numpy as np
-import sys
+
 
 class DatasetView(h5py.Dataset):
 
     def __init__(self, dataset: h5py.Dataset = None, slice_index=(np.index_exp[:],()), axis_order=None):
         """
         Args:
-          dataset:    the underlying dataset
-          slice_index:  the aggregate slice and int indices after multiple lazy calls
+          dataset:     the underlying dataset
+          slice_index: the aggregate slice and int indices after multiple lazy calls
           axis_order: the aggregate axis_order after multiple transpositions
         Returns:
           lazy object of the view
@@ -82,10 +82,18 @@ class DatasetView(h5py.Dataset):
     def _slice_shape(self, slice_):
         """  For an slice returned by _slice_composition function, finds the shape
         Args:
-          slice_: The slice object
+          slice_: The slice and int_index object
         Returns:
           slice_shape: Shape of the slice object
           slice_key: An equivalent slice tuple with positive starts and stops
+          int_index: a nested tuple, int_index records the information needed by dsetread to access data
+                                     Each element of int_index, denoted ind is given by:
+                                     int_index[2] is the dataset axis at which the integer index operates
+                                     int_index[1] is the value of the integer index entered by the user
+                                     int_index[0] is the lazy_axis at which the integer index operates
+                                                  ,the lazy_axis is the axis number had the operations
+                                                  been carried out by h5py instead of lazy_ops
+          axis_order: removes the elements of current axis_order where integer indexing has been applied
         """
         int_ind = slice_[1]
         slice_ = self._slice_tuple(slice_[0])
@@ -153,17 +161,19 @@ class DatasetView(h5py.Dataset):
         # retain shape information of the other dimensions
         lazy_axis_order = self.axis_order
         lazy_key = self.key
-        axis_order_slice_iter = self.axis_order
         for ind in self._int_index:
             lazy_axis_order = lazy_axis_order[:ind[0]] + (ind[2],) + lazy_axis_order[ind[0]:]
             lazy_key = lazy_key[:ind[0]] + (ind[1],) + lazy_key[ind[0]:]
-        for ind in reversed(self._int_index):
-            axis_order_slice_iter = tuple(i if i<ind[2] else i-1 for i in axis_order_slice_iter)
 
         reversed_axis_order = sorted(range(len(lazy_axis_order)), key=lambda i: lazy_axis_order[i])
         reversed_slice_key = tuple(lazy_key[i] for i in reversed_axis_order if i < len(lazy_key))
 
-        return self.dataset[reversed_slice_key].transpose(axis_order_slice_iter)
+        # this is equivalent to reducing the values in the self.axis_order to account for
+        # dimensions dropped by int indexing
+        reversed_axis_order_read = sorted(range(len(self.axis_order)), key=lambda i: self.axis_order[i])
+        axis_order_read = sorted(range(len(self.axis_order)), key=lambda i: reversed_axis_order_read[i])
+
+        return self.dataset[reversed_slice_key].transpose(axis_order_read)
 
     def _slice_composition(self, new_slice):
         """  composes a new_slice with the self.key slice
@@ -251,46 +261,10 @@ class DatasetView(h5py.Dataset):
 
         return DatasetView(self.dataset, (key_reinit, self._int_index), axis_order_reinit)
 
-    def read_direct(self, dest, source_sel=None, dest_sel=None):
-        """ Using dataset.read_direct, reads data into an existing array
-        Args:
-          dest: C-contiguous as required by Dataset.read_direct
-          source_sel: new selection slice
-          dest_sel: output selection slice
-        Returns:
-          numpy array
+    def __array__(self):
+        """ Convert to numpy array
         """
-        if source_sel is None:
-            new_key, new_int_index, new_axis_order = self.key, self._int_index, self.axis_order
-        else:
-            key_reinit = self._slice_composition(source_sel)
-            _, new_key, new_int_index, new_axis_order = self._slice_shape(key_reinit)
-        axis_order_slice_iter = new_axis_order
-        for ind in new_int_index:
-            new_axis_order = new_axis_order[:ind[0]] + (ind[2],) + new_axis_order[ind[0]:]
-            new_key = new_key[:ind[0]] + (ind[1],) + new_key[ind[0]:]
-        for ind in reversed(new_int_index):
-            axis_order_slice_iter = tuple(i if i<ind[2] else i-1 for i in axis_order_slice_iter)
-
-        reversed_axis_order = sorted(range(len(new_axis_order)), key=lambda i: new_axis_order[i])
-        reversed_slice_key = tuple(new_key[i] for i in reversed_axis_order if i < len(new_key))
-        #convert reversed_slice_key to numpy.s_[<args>] format, expected by dataset.read_direct
-        if len(reversed_slice_key) == 1:
-            reversed_slice_key = reversed_slice_key[0]
-
-        reversed_dest_shape = tuple(dest.shape[i] for i in reversed_axis_order if i < len(dest.shape))
-        reversed_dest = np.empty(shape=reversed_dest_shape, dtype=dest.dtype)
-
-        if dest_sel is None:
-            reversed_dest_sel = dest_sel
-        else:
-            reversed_dest_sel = tuple(dest_sel[i] for i in reversed_axis_order if i < len(dest_sel))
-            #convert reversed_dest_sel to numpy.s_[<args>] format, expected by dataset.read_direct
-            if len(reversed_slice_key) == 1:
-                reversed_slice_key = reversed_slice_key[0]
-
-        self.dataset.read_direct(reversed_dest, source_sel=reversed_slice_key, dest_sel=reversed_dest_sel)
-        np.copyto(dest, reversed_dest.transpose(axis_order_slice_iter))
+        return np.atleast_1d(self.dsetread())
 
     def _ellipsis_slices(self, new_slice):
         """ Change Ellipsis dimensions to slices
@@ -311,6 +285,45 @@ class DatasetView(h5py.Dataset):
             raise IndexError("Only a single Ellipsis is allowed")
         return new_slice
 
+    def read_direct(self, dest, source_sel=None, dest_sel=None):
+        """ Using dataset.read_direct, reads data into an existing array
+        Args:
+          dest: C-contiguous as required by Dataset.read_direct
+          source_sel: new selection slice
+          dest_sel: output selection slice
+        Returns:
+          numpy array
+        """
+
+        if source_sel is None:
+            new_key, new_int_index, new_axis_order = self.key, self._int_index, self.axis_order
+        else:
+            key_reinit = self._slice_composition(source_sel)
+            _, new_key, new_int_index, new_axis_order = self._slice_shape(key_reinit)
+        axis_order_slices = new_axis_order
+        for ind in new_int_index:
+            new_axis_order = new_axis_order[:ind[0]] + (ind[2],) + new_axis_order[ind[0]:]
+            new_key = new_key[:ind[0]] + (ind[1],) + new_key[ind[0]:]
+
+        reversed_axis_order = sorted(range(len(new_axis_order)), key=lambda i: new_axis_order[i])
+        reversed_slice_key = tuple(new_key[i] for i in reversed_axis_order if i < len(new_key))
+
+        # this is equivalent to reducing the values in the self.axis_order to account for
+        # dimensions dropped by int indexing
+        reversed_axis_order_read = sorted(range(len(axis_order_slices)), key=lambda i: axis_order_slices[i])
+        axis_order_read = sorted(range(len(axis_order_slices)), key=lambda i: reversed_axis_order_read[i])
+
+        reversed_dest_shape = tuple(dest.shape[i] for i in reversed_axis_order_read if i < len(dest.shape))
+        reversed_dest = np.empty(shape=reversed_dest_shape, dtype=dest.dtype)
+
+        if dest_sel is None:
+            reversed_dest_sel = dest_sel
+        else:
+            reversed_dest_sel = tuple(dest_sel[i] for i in reversed_axis_order if i < len(dest_sel))
+
+        self.dataset.read_direct(reversed_dest, source_sel=reversed_slice_key, dest_sel=reversed_dest_sel)
+        np.copyto(dest, reversed_dest.transpose(axis_order_read))
+
 def lazy_transpose(dset: h5py.Dataset, axes=None):
     """ Array lazy transposition, not passing axis argument reverses the order of dimensions
     Args:
@@ -321,5 +334,5 @@ def lazy_transpose(dset: h5py.Dataset, axes=None):
     """
     if axes is None:
         axes = tuple(reversed(range(len(dset.shape))))
-    
+
     return DatasetView(dset).lazy_transpose(axis_order=axes)
