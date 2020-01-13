@@ -9,9 +9,7 @@ from numpy.testing import assert_array_equal
 
 def test_func():
 
-    if os.path.isfile('testfile.hdf5'):
-        os.remove('testfile.hdf5')
-    f = h5py.File('testfile.hdf5')
+    f = h5py.File('testfile.hdf5','w')
     ndims = 4
     secret_rand = secrets.SystemRandom()
     dset = f.create_dataset(name='test_dataset', data=np.random.rand(*secret_rand.sample(range(1, 200//ndims), ndims)))
