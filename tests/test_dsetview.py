@@ -93,7 +93,7 @@ class LazyOpsTest(unittest.TestCase):
         assert_array_equal(self.dset[slices], self.dsetview[slices])
 
     ##########################################
-    #  tests for single lazy operaion calls  #
+    #  tests for single lazy operation calls #
     ##########################################
 
     @dset_iterator
@@ -150,9 +150,9 @@ class LazyOpsTest(unittest.TestCase):
         # test lazy_ops.lazy_transpose
         assert_array_equal(np.transpose(self.dset[()], axis),lazy_transpose(self.dsetview, axis))
 
-    ##########################################
-    # tests for multiple lazy operaion calls #
-    ##########################################
+    ###########################################
+    # tests for multiple lazy operation calls #
+    ###########################################
 
     # lazy_slice with slices followed by lazy_transpose call
     @dset_iterator
