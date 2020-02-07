@@ -14,7 +14,6 @@ B = view1.dsetread()  # same as view1[:]
 import h5py
 import numpy as np
 
-
 class DatasetView(h5py.Dataset):
 
     def __init__(self, dataset: h5py.Dataset = None, slice_index=(np.index_exp[:],()), axis_order=None):
@@ -26,8 +25,10 @@ class DatasetView(h5py.Dataset):
         Returns:
           lazy object of the view
         """
-
-        h5py.Dataset.__init__(self, dataset.id)
+        if dataset is None or isinstance(dataset,h5py.Dataset) is False:
+            raise TypeError("DatasetView requires a h5py.Dataset as positional argument")
+        else:
+            h5py.Dataset.__init__(self, dataset.id)
         if axis_order is None:
             self._axis_order = tuple(range(len(dataset.shape)))
         else:
@@ -72,7 +73,7 @@ class DatasetView(h5py.Dataset):
         Returns:
           The slice object tuple
         """
-        if isinstance(key, (slice,int)):
+        if isinstance(key, (slice,int,np.ndarray)):
             key = key,
         else:
             key = *key,
@@ -88,9 +89,9 @@ class DatasetView(h5py.Dataset):
           slice_key: An equivalent slice tuple with positive starts and stops
           int_index: a nested tuple, int_index records the information needed by dsetread to access data
                                      Each element of int_index, denoted ind is given by:
-                                     int_index[2] is the dataset axis at which the integer index operates
-                                     int_index[1] is the value of the integer index entered by the user
-                                     int_index[0] is the lazy_axis at which the integer index operates
+                                     ind[2] is the dataset axis at which the integer index operates
+                                     ind[1] is the value of the integer index entered by the user
+                                     ind[0] is the lazy_axis at which the integer index operates
                                                   ,the lazy_axis is the axis number had the operations
                                                   been carried out by h5py instead of lazy_ops
           axis_order: removes the elements of current axis_order where integer indexing has been applied
@@ -220,20 +221,28 @@ class DatasetView(h5py.Dataset):
                     slice_result += (new_slice[i],)
             else:
                 try:
-                    if any(not isinstance(el,int) for el in new_slice[i]):
-                        raise ValueError("Indices must be integers")
+                    if not all(isinstance(el,int) for el in new_slice[i]):
+                        if new_slice[i].dtype.kind != 'b':
+                            raise ValueError("Indices must be either integers or booleans")
+                        else:
+                            # boolean indexing
+                            if len(new_slice[i]) != self.shape[i]:
+                                raise IndexError("Length of boolean index $d must be equal to size %d in dim %d" % (len(new_slice[i]),self.shape[i],i))
+                            new_slice_i = new_slice[i].nonzero()[0]
+                    else:
+                        new_slice_i = new_slice[i]
                     if i < len(self.key):
-                        if any(el >= self._shape[i] or el <= ~self._shape[i] for el in new_slice[i]):
-                            raise IndexError("Index %s out of range, dim %d of size %d" % (str(new_slice[i]),i,self._shape[i]))
+                        if any(el >= self._shape[i] or el <= ~self._shape[i] for el in new_slice_i):
+                            raise IndexError("Index %s out of range, dim %d of size %d" % (str(new_slice_i),i,self._shape[i]))
                         if isinstance(self.key[i],slice):
-                            slice_result += (tuple(self.key[i].start + self.key[i].step*(ind%self._shape[i]) for ind in new_slice[i]),)
+                            slice_result += (tuple(self.key[i].start + self.key[i].step*(ind%self._shape[i]) for ind in new_slice_i),)
                         else:
                             # self.key[i] is an iterator of integers
-                            slice_result += (tuple(self.key[i][ind] for ind in new_slice[i]),)
+                            slice_result += (tuple(self.key[i][ind] for ind in new_slice_i),)
                     else:
-                        slice_result += (new_slice[i],)
+                        slice_result += (new_slice_i,)
                 except:
-                    raise IndexError("Indices must be either integers, iterators of integers, or slice objects")
+                    raise IndexError("Indices must be either integers, iterators of integers, slice objects, or numpy boolean arrays")
         slice_result += self.key[len(new_slice):]
 
         return slice_result
@@ -273,7 +282,7 @@ class DatasetView(h5py.Dataset):
         Returns:
           equivalent slices with Ellipsis expanded
         """
-        ellipsis_count = new_slice.count(Ellipsis)
+        ellipsis_count = sum(s==Ellipsis for s in new_slice if not isinstance(s,np.ndarray))
         if ellipsis_count == 1:
             ellipsis_index = new_slice.index(Ellipsis)
             if ellipsis_index == len(new_slice)-1:

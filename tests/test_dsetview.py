@@ -27,7 +27,6 @@ class LazyOpsTest(unittest.TestCase):
 
         self.ndims = 7
         num_datasets = 5
-        self.srand = secrets.SystemRandom()
         self.dset_list = list(self.h5py_file.create_dataset(name='dset'+str(i),
                               data=np.random.rand(*self.srand.choices(range(1, 90//self.ndims), k=self.ndims)))
                               for i in range(num_datasets))
@@ -66,13 +65,44 @@ class LazyOpsTest(unittest.TestCase):
                      for i in range(len(shape)))
 
     @classmethod
+    def _bool_indexing(cls,shape):
+        ''' find an appropriate tuple with a single array index '''
+        single_array_dim = cls.srand.randrange(0,len(shape))
+        single_bool_indexing = np.array(cls.srand.choices([True,False], k=shape[single_array_dim]))
+        return tuple(slice(None,None,None) if i != single_array_dim else single_bool_indexing
+                     for i in range(len(shape)))
+
+    @classmethod
     def _slices_and_int(cls,shape):
         ''' find an appropriate tuple of slices and integers '''
         return tuple(slice(cls.srand.randint(~s-1, s+1), cls.srand.randint(~s-1, s+1),
                            cls.srand.randint(1, s))
-                           if cls.srand.choice([True, False]) else 
+                           if cls.srand.choice([True, False]) else
                            cls.srand.randint(0, s-1)
                            for s in shape)
+
+    @classmethod
+    def _slices_and_array(cls,shape, single_array_dim):
+        ''' find an appropriate tuple of slices and a single array index'''
+        single_array_len = cls.srand.randrange(0,shape[single_array_dim])
+        single_array_indexing = sorted(cls.srand.sample(range(shape[single_array_dim]),
+                                                        single_array_len))
+        return tuple(slice(cls.srand.randint(~s-1, s+1), cls.srand.randint(~s-1, s+1),
+                           cls.srand.randint(1, s))
+                           if i != single_array_dim else
+                           single_array_indexing
+                           for i, s in enumerate(shape))
+
+    @classmethod
+    def _slices_and_bool(cls,shape, single_array_dim):
+        ''' find an appropriate tuple of slices and a single array index'''
+        single_bool_indexing = np.array(cls.srand.choices([True,False], k=shape[single_array_dim]))
+        return tuple(slice(cls.srand.randint(~s-1, s+1), cls.srand.randint(~s-1, s+1),
+                           cls.srand.randint(1, s))
+                           if i != single_array_dim else
+                           single_bool_indexing
+                           for i, s in enumerate(shape))
+
 
     ##########################################
     #  basic tests                           #
@@ -106,6 +136,12 @@ class LazyOpsTest(unittest.TestCase):
         assert_array_equal(self.dset[slices], self.dsetview.lazy_slice[slices])
 
     @dset_iterator
+    def test_dsetview_lazy_slice_bool(self):
+        # test __getitem__ read after lazy_slice, single slice
+        indexing = self._bool_indexing(self.dset.shape)
+        assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
+
+    @dset_iterator
     def test_dsetview_lazy_slice_lower_dimensions(self):
         for num_slice_dims in range(1, len(self.dset.shape)+1):
             slices = self._slices(self.dset.shape[:num_slice_dims])
@@ -137,6 +173,19 @@ class LazyOpsTest(unittest.TestCase):
             assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
 
     @dset_iterator
+    def test_dsetview_lazy_slice_bool_indexing(self):
+        for num_slice_dims in range(2, len(self.dset.shape)+1):
+            # num_slice_dims starts from 2, dset[(1-D bool np.ndarray,)] is invalid in h5py
+            # dset[(1-D bool np.ndarray, slice(None))] is valid
+            indexing = self._bool_indexing(self.dset.shape[:num_slice_dims])
+            # test __getitem__ read specifying lower dimensions
+            assert_array_equal(self.dset[indexing], self.dsetview[indexing])
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # bool indexing only
+            assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
+
+    @dset_iterator
     def test_dsetview_lazy_iter(self):
         for axis in range(len(self.dset.shape)):
             for i,dsetview_lazy_i in enumerate(self.dsetview.lazy_iter(axis = axis)):
@@ -149,6 +198,86 @@ class LazyOpsTest(unittest.TestCase):
         assert_array_equal(self.dset[()].transpose(axis), self.dsetview.lazy_transpose(axis))
         # test lazy_ops.lazy_transpose
         assert_array_equal(np.transpose(self.dset[()], axis),lazy_transpose(self.dsetview, axis))
+
+    ###########################################
+    # tests for multiple lazy slice calls     #
+    ###########################################
+
+    # multi lazy_slice using only slices
+    @dset_iterator
+    def test_dsetview_multi_lazy_slice(self):
+        self._dsetview_multi_lazy_slice(self.dset, self.dsetview)
+
+    @classmethod
+    def _dsetview_multi_lazy_slice(cls, dset, dsetview):
+        for num_slice_dims in range(1, len(dset.shape)+1):
+            slices = cls._slices(dset.shape[:num_slice_dims])
+            dset_new = dset[slices]
+            dsetview_new = dsetview.lazy_slice[slices]
+            # test __getitem__ read after lazy_slice for lower dimensions
+            assert_array_equal(dset_new, dsetview_new)
+            if np.prod(dset_new.shape) != 0:
+                cls._dsetview_multi_lazy_slice(dset_new, dsetview_new)
+
+    # multi lazy_slice using slices and int indexing
+    @dset_iterator
+    def test_dsetview_multi_lazy_slice_with_slice_and_int_indexing(self):
+        self._dsetview_multi_lazy_slice_with_slice_and_int_indexing(self.dset, self.dsetview)
+
+    @classmethod
+    def _dsetview_multi_lazy_slice_with_slice_and_int_indexing(cls, dset, dsetview):
+        for num_slice_dims in range(1, len(dset.shape)+1):
+            indexing = cls._slices_and_int(dset.shape[:num_slice_dims])
+            dset_new = dset[indexing]
+            dsetview_new = dsetview.lazy_slice[indexing]
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # combination of slice and int indexing
+            assert_array_equal(dset_new, dsetview_new)
+            if np.prod(dset_new.shape) != 0:
+                cls._dsetview_multi_lazy_slice_with_slice_and_int_indexing(dset_new, dsetview_new)
+
+    # multi lazy_slice using slices and array indexing
+    @dset_iterator
+    def test_dsetview_multi_lazy_slice_with_slice_and_array_indexing(self):
+        remaining_slice_calls = 10
+        array_dim = self.srand.randint(0, len(self.dset.shape)-1)
+        self._dsetview_multi_lazy_slice_with_slice_and_array_indexing(self.dset, self.dsetview, remaining_slice_calls, array_dim)
+
+    @classmethod
+    def _dsetview_multi_lazy_slice_with_slice_and_array_indexing(cls, dset, dsetview, remaining_slice_calls, array_dim):
+        for num_slice_dims in range(array_dim+1, len(dset.shape)+1):
+            indexing = cls._slices_and_array(dset.shape[:num_slice_dims], array_dim)
+            dset_new = dset[indexing]
+            dsetview_new = dsetview.lazy_slice[indexing]
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # combination of slice and array indexing
+            assert_array_equal(dset_new, dsetview_new)
+            if np.prod(dset_new.shape) != 0 and remaining_slice_calls > 0:
+                cls._dsetview_multi_lazy_slice_with_slice_and_array_indexing(dset_new, dsetview_new, remaining_slice_calls - 1, array_dim)
+
+    # multi lazy_slice using slices and boolean array indexing
+    @dset_iterator
+    def test_dsetview_multi_lazy_slice_with_slice_and_bool_indexing(self):
+        remaining_slice_calls = 4
+        array_dim = self.srand.randint(1, len(self.dset.shape)-1)
+        # array_dim starts from 1, for array_dim=0, dset[(1-D bool np.ndarray,)] is invalid in h5py
+        # dset[(slice(None),1-D bool np.ndarray)] is valid
+        self._dsetview_multi_lazy_slice_with_slice_and_bool_indexing(self.dset, self.dsetview, remaining_slice_calls, array_dim)
+
+    @classmethod
+    def _dsetview_multi_lazy_slice_with_slice_and_bool_indexing(cls, dset, dsetview, remaining_slice_calls, array_dim):
+        for num_slice_dims in range(array_dim+1, len(dset.shape)+1):
+            indexing = cls._slices_and_bool(dset.shape[:num_slice_dims], array_dim)
+            dset_new = dset[indexing]
+            dsetview_new = dsetview.lazy_slice[indexing]
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # combination of slice and bool indexing
+            assert_array_equal(dset_new, dsetview_new)
+            if np.prod(dset_new.shape) != 0 and remaining_slice_calls > 0:
+                cls._dsetview_multi_lazy_slice_with_slice_and_bool_indexing(dset_new, dsetview_new, remaining_slice_calls - 1, array_dim)
 
     ###########################################
     # tests for multiple lazy operation calls #
@@ -180,22 +309,6 @@ class LazyOpsTest(unittest.TestCase):
         if remaining_transpose_calls > 0:
             self._dsetview_multi_lazy_transpose(dset_new, dsetview_new, remaining_transpose_calls - 1)
 
-    # multi lazy_slice using only slices
-    @dset_iterator
-    def test_dsetview_multi_lazy_slice(self):
-        self._dsetview_multi_lazy_slice(self.dset, self.dsetview)
-
-    @classmethod
-    def _dsetview_multi_lazy_slice(cls, dset, dsetview):
-        for num_slice_dims in range(1, len(dset.shape)+1):
-            slices = cls._slices(dset.shape[:num_slice_dims])
-            dset_new = dset[slices]
-            dsetview_new = dsetview.lazy_slice[slices]
-            # test __getitem__ read after lazy_slice for lower dimensions
-            assert_array_equal(dset_new, dsetview_new)
-            if np.prod(dset_new.shape) != 0:
-                cls._dsetview_multi_lazy_slice(dset_new, dsetview_new)
-
     # multi lazy_transpose and lazy_slice using only slices
     @dset_iterator
     def test_dsetview_multi_lazy_ops_with_slice_indexing(self):
@@ -223,11 +336,11 @@ class LazyOpsTest(unittest.TestCase):
 
     # multi lazy_transpose and lazy_slice using slices and int
     @dset_iterator
-    def test_dsetview_multi_lazy_slice_with_slice_and_int_indexing(self):
-        self._dsetview_multi_lazy_slice_with_slice_and_int_indexing(self.dset, self.dsetview)
+    def test_dsetview_multi_lazy_ops_with_slice_and_int_indexing(self):
+        self._dsetview_multi_lazy_ops_with_slice_and_int_indexing(self.dset, self.dsetview)
 
     @classmethod
-    def _dsetview_multi_lazy_slice_with_slice_and_int_indexing(cls, dset, dsetview):
+    def _dsetview_multi_lazy_ops_with_slice_and_int_indexing(cls, dset, dsetview):
         for num_slice_dims in range(1, len(dset.shape)+1):
             slices = cls._slices_and_int(dset.shape[:num_slice_dims])
             dset_new = dset[slices]
@@ -237,5 +350,5 @@ class LazyOpsTest(unittest.TestCase):
             # combination of slice and int indexing
             assert_array_equal(dset_new, dsetview_new)
             if np.prod(dset_new.shape) != 0:
-                cls._dsetview_multi_lazy_slice_with_slice_and_int_indexing(dset_new, dsetview_new)
+                cls._dsetview_multi_lazy_ops_with_slice_and_int_indexing(dset_new, dsetview_new)
 
