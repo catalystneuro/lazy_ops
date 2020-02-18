@@ -1,4 +1,3 @@
-import h5py
 import numpy as np
 from lazy_ops import DatasetView, lazy_transpose
 import secrets
@@ -6,6 +5,9 @@ from numpy.testing import assert_array_equal
 import unittest
 import tempfile
 from functools import wraps
+import h5py
+import zarr
+import pytest
 
 # Define decorator to iterate over dset_list
 def dset_iterator(f):
@@ -15,26 +17,9 @@ def dset_iterator(f):
             f(self, *args, **kwargs)
     return wrapper
 
-class LazyOpsTest(unittest.TestCase):
-    ''' Class array equality test '''
+class LazyOpsBase(object):
 
     srand = secrets.SystemRandom()
-
-    def setUp(self):
-        self.temp_file = tempfile.NamedTemporaryFile(suffix=".hdf5", delete=False)
-        self.temp_file.close()
-        self.h5py_file = h5py.File(self.temp_file.name,'w')
-
-        self.ndims = 7
-        num_datasets = 5
-        self.dset_list = list(self.h5py_file.create_dataset(name='dset'+str(i),
-                              data=np.random.rand(*self.srand.choices(range(1, 90//self.ndims), k=self.ndims)))
-                              for i in range(num_datasets))
-        self.dsetview_list = list(DatasetView(self.dset_list[i]) for i in range(num_datasets))
-
-    def tearDown(self):
-        self.temp_file.delete = True
-        self.temp_file.close()
 
     @classmethod
     def _slices(cls,shape):
@@ -162,30 +147,6 @@ class LazyOpsTest(unittest.TestCase):
             assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
 
     @dset_iterator
-    def test_dsetview_lazy_slice_array_indexing(self):
-        for num_slice_dims in range(1, len(self.dset.shape)+1):
-            indexing = self._array_indexing(self.dset.shape[:num_slice_dims])
-            # test __getitem__ read specifying lower dimensions
-            assert_array_equal(self.dset[indexing], self.dsetview[indexing])
-            # test __getitem__ read after lazy_slice
-            # for lower and all dimensions
-            # array indexing only
-            assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
-
-    @dset_iterator
-    def test_dsetview_lazy_slice_bool_indexing(self):
-        for num_slice_dims in range(2, len(self.dset.shape)+1):
-            # num_slice_dims starts from 2, dset[(1-D bool np.ndarray,)] is invalid in h5py
-            # dset[(1-D bool np.ndarray, slice(None))] is valid
-            indexing = self._bool_indexing(self.dset.shape[:num_slice_dims])
-            # test __getitem__ read specifying lower dimensions
-            assert_array_equal(self.dset[indexing], self.dsetview[indexing])
-            # test __getitem__ read after lazy_slice
-            # for lower and all dimensions
-            # bool indexing only
-            assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
-
-    @dset_iterator
     def test_dsetview_lazy_iter(self):
         for axis in range(len(self.dset.shape)):
             for i,dsetview_lazy_i in enumerate(self.dsetview.lazy_iter(axis = axis)):
@@ -236,48 +197,6 @@ class LazyOpsTest(unittest.TestCase):
             assert_array_equal(dset_new, dsetview_new)
             if np.prod(dset_new.shape) != 0:
                 cls._dsetview_multi_lazy_slice_with_slice_and_int_indexing(dset_new, dsetview_new)
-
-    # multi lazy_slice using slices and array indexing
-    @dset_iterator
-    def test_dsetview_multi_lazy_slice_with_slice_and_array_indexing(self):
-        remaining_slice_calls = 10
-        array_dim = self.srand.randint(0, len(self.dset.shape)-1)
-        self._dsetview_multi_lazy_slice_with_slice_and_array_indexing(self.dset, self.dsetview, remaining_slice_calls, array_dim)
-
-    @classmethod
-    def _dsetview_multi_lazy_slice_with_slice_and_array_indexing(cls, dset, dsetview, remaining_slice_calls, array_dim):
-        for num_slice_dims in range(array_dim+1, len(dset.shape)+1):
-            indexing = cls._slices_and_array(dset.shape[:num_slice_dims], array_dim)
-            dset_new = dset[indexing]
-            dsetview_new = dsetview.lazy_slice[indexing]
-            # test __getitem__ read after lazy_slice
-            # for lower and all dimensions
-            # combination of slice and array indexing
-            assert_array_equal(dset_new, dsetview_new)
-            if np.prod(dset_new.shape) != 0 and remaining_slice_calls > 0:
-                cls._dsetview_multi_lazy_slice_with_slice_and_array_indexing(dset_new, dsetview_new, remaining_slice_calls - 1, array_dim)
-
-    # multi lazy_slice using slices and boolean array indexing
-    @dset_iterator
-    def test_dsetview_multi_lazy_slice_with_slice_and_bool_indexing(self):
-        remaining_slice_calls = 4
-        array_dim = self.srand.randint(1, len(self.dset.shape)-1)
-        # array_dim starts from 1, for array_dim=0, dset[(1-D bool np.ndarray,)] is invalid in h5py
-        # dset[(slice(None),1-D bool np.ndarray)] is valid
-        self._dsetview_multi_lazy_slice_with_slice_and_bool_indexing(self.dset, self.dsetview, remaining_slice_calls, array_dim)
-
-    @classmethod
-    def _dsetview_multi_lazy_slice_with_slice_and_bool_indexing(cls, dset, dsetview, remaining_slice_calls, array_dim):
-        for num_slice_dims in range(array_dim+1, len(dset.shape)+1):
-            indexing = cls._slices_and_bool(dset.shape[:num_slice_dims], array_dim)
-            dset_new = dset[indexing]
-            dsetview_new = dsetview.lazy_slice[indexing]
-            # test __getitem__ read after lazy_slice
-            # for lower and all dimensions
-            # combination of slice and bool indexing
-            assert_array_equal(dset_new, dsetview_new)
-            if np.prod(dset_new.shape) != 0 and remaining_slice_calls > 0:
-                cls._dsetview_multi_lazy_slice_with_slice_and_bool_indexing(dset_new, dsetview_new, remaining_slice_calls - 1, array_dim)
 
     ###########################################
     # tests for multiple lazy operation calls #
@@ -352,3 +271,121 @@ class LazyOpsTest(unittest.TestCase):
             if np.prod(dset_new.shape) != 0:
                 cls._dsetview_multi_lazy_ops_with_slice_and_int_indexing(dset_new, dsetview_new)
 
+class LazyOpsBaseh5py(object):
+
+    ###########################################################
+    #  tests for single lazy operation calls specific to h5py #
+    ###########################################################
+
+    @dset_iterator
+    def test_dsetview_lazy_slice_bool(self):
+        # test __getitem__ read after lazy_slice, single slice
+        indexing = self._bool_indexing(self.dset.shape)
+        assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
+
+    @dset_iterator
+    def test_dsetview_lazy_slice_array_indexing(self):
+        for num_slice_dims in range(1, len(self.dset.shape)+1):
+            indexing = self._array_indexing(self.dset.shape[:num_slice_dims])
+            # test __getitem__ read specifying lower dimensions
+            assert_array_equal(self.dset[indexing], self.dsetview[indexing])
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # array indexing only
+            assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
+
+    @dset_iterator
+    def test_dsetview_lazy_slice_bool_indexing(self):
+        for num_slice_dims in range(2, len(self.dset.shape)+1):
+            # num_slice_dims starts from 2, dset[(1-D bool np.ndarray,)] is invalid in h5py
+            # dset[(1-D bool np.ndarray, slice(None))] is valid
+            indexing = self._bool_indexing(self.dset.shape[:num_slice_dims])
+            # test __getitem__ read specifying lower dimensions
+            assert_array_equal(self.dset[indexing], self.dsetview[indexing])
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # bool indexing only
+            assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
+
+    ########################################################
+    # tests for multiple lazy slice calls specific to h5py #
+    ########################################################
+
+    # multi lazy_slice using slices and array indexing
+    @dset_iterator
+    def test_dsetview_multi_lazy_slice_with_slice_and_array_indexing(self):
+        remaining_slice_calls = 10
+        array_dim = self.srand.randint(0, len(self.dset.shape)-1)
+        self._dsetview_multi_lazy_slice_with_slice_and_array_indexing(self.dset, self.dsetview, remaining_slice_calls, array_dim)
+
+    @classmethod
+    def _dsetview_multi_lazy_slice_with_slice_and_array_indexing(cls, dset, dsetview, remaining_slice_calls, array_dim):
+        for num_slice_dims in range(array_dim+1, len(dset.shape)+1):
+            indexing = cls._slices_and_array(dset.shape[:num_slice_dims], array_dim)
+            dset_new = dset[indexing]
+            dsetview_new = dsetview.lazy_slice[indexing]
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # combination of slice and array indexing
+            assert_array_equal(dset_new, dsetview_new)
+            if np.prod(dset_new.shape) != 0 and remaining_slice_calls > 0:
+                cls._dsetview_multi_lazy_slice_with_slice_and_array_indexing(dset_new, dsetview_new, remaining_slice_calls - 1, array_dim)
+
+    # multi lazy_slice using slices and boolean array indexing
+    @dset_iterator
+    def test_dsetview_multi_lazy_slice_with_slice_and_bool_indexing(self):
+        remaining_slice_calls = 4
+        array_dim = self.srand.randint(1, len(self.dset.shape)-1)
+        # array_dim starts from 1, for array_dim=0, dset[(1-D bool np.ndarray,)] is invalid in h5py
+        # dset[(slice(None),1-D bool np.ndarray)] is valid
+        self._dsetview_multi_lazy_slice_with_slice_and_bool_indexing(self.dset, self.dsetview, remaining_slice_calls, array_dim)
+
+    @classmethod
+    def _dsetview_multi_lazy_slice_with_slice_and_bool_indexing(cls, dset, dsetview, remaining_slice_calls, array_dim):
+        for num_slice_dims in range(array_dim+1, len(dset.shape)+1):
+            indexing = cls._slices_and_bool(dset.shape[:num_slice_dims], array_dim)
+            dset_new = dset[indexing]
+            dsetview_new = dsetview.lazy_slice[indexing]
+            # test __getitem__ read after lazy_slice
+            # for lower and all dimensions
+            # combination of slice and bool indexing
+            assert_array_equal(dset_new, dsetview_new)
+            if np.prod(dset_new.shape) != 0 and remaining_slice_calls > 0:
+                cls._dsetview_multi_lazy_slice_with_slice_and_bool_indexing(dset_new, dsetview_new, remaining_slice_calls - 1, array_dim)
+
+class LazyOpszarrTest(LazyOpsBase,unittest.TestCase):
+    ''' Class zarr array equality test '''
+
+    def setUp(self):
+        self.ndims = 7
+        num_datasets = 3
+
+        self.temp_dir_zarr = tempfile.TemporaryDirectory(suffix=".zgroup")
+        self.zarr_group = zarr.group(store=self.temp_dir_zarr.name, overwrite=True)
+        self.dset_list = list(self.zarr_group.create_dataset(name='zarray'+str(i),
+                              data=np.random.rand(*self.srand.choices(range(1, 90//self.ndims), k=self.ndims)))
+                              for i in range(num_datasets))
+        self.dsetview_list = list(DatasetView(self.dset_list[i]) for i in range(num_datasets))
+        print(LazyOpszarrTest)
+
+    def tearDown(self):
+        self.temp_dir_zarr.cleanup()
+
+class LazyOpsh5pyTest(LazyOpsBase,LazyOpsBaseh5py,unittest.TestCase):
+    ''' Class h5py dataset array equality test '''
+
+    def setUp(self):
+        self.temp_file = tempfile.NamedTemporaryFile(suffix=".hdf5", delete=False)
+        self.temp_file.close()
+        self.h5py_file = h5py.File(self.temp_file.name,'w')
+
+        self.ndims = 7
+        num_datasets = 3
+        self.dset_list = list(self.h5py_file.create_dataset(name='dset'+str(i),
+                              data=np.random.rand(*self.srand.choices(range(1, 90//self.ndims), k=self.ndims)))
+                              for i in range(num_datasets))
+        self.dsetview_list = list(DatasetView(self.dset_list[i]) for i in range(num_datasets))
+
+    def tearDown(self):
+        self.temp_file.delete = True
+        self.temp_file.close()
