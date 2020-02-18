@@ -11,16 +11,24 @@ $ pip install lazy_ops
 ## Usage:
 
 ```python
-import h5py
 from lazy_ops import DatasetView
 
-dsetview = DatasetView(dataset) # dataset is an instantiated h5py dataset
-view1 = dsetview.lazy_slice[1:10:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice[25:55,1,1:4:1,:].lazy_transpose()
+# h5py #
+import h5py
+dsetview = DatasetView(dataset) # dataset is an instance of h5py.Dataset
+view1 = dsetview.lazy_slice[1:40:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice[8,5:10]
 
-A = view1[:]          # Brackets on DataSetView call the h5py slicing method, that returns the data
+# zarr #
+import zarr
+zarrview = DatasetView(zarray) # dataset is an instance of zarr.core.Array
+view1 = zview.lazy_slice[1:10:2,:,5:10].lazy_transpose([0,2,1]).lazy_slice[0:3,1:4]
+
+# reading from view on either h5py or zarr
+A = view1[:]          # Brackets on DataSetView call the h5py or zarr slicing method, returning the data
 B = view1.dsetread()  # same as view1[:]
 
-for ib in view1.lazy_iter(axis=1):
+# iterating on either h5yy or zarr
+for ib in view.lazy_iter(axis=1):
     print(ib[0])
 
 ```
