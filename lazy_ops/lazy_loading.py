@@ -1,34 +1,65 @@
-"""Provides a class to allow for lazy transposing and slicing operations on h5py datasets
-Example Usage:
-import h5py
+"""Provides a class to allow for lazy transposing and slicing operations on h5py datasets and zarr arrays
+
+## Usage:
+
 from lazy_ops import DatasetView
 
+# h5py #
+import h5py
+dsetview = DatasetView(dataset) # dataset is an instance of h5py.Dataset
+view1 = dsetview.lazy_slice[1:40:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice[8,5:10]
 
-dsetview = DatasetView(dataset) # dataset is an instantiated h5py dataset
-view1 = dsetview.lazy_slice[1:10:2,:,0:50:5].lazy_transpose([2,0,1]).lazy_slice[25:55,1,1:4:1,:]
-A = view1[:]          # Brackets on DataSetView call the h5py slicing method, that returns dataset data
+# zarr #
+import zarr
+zarrview = DatasetView(zarray) # dataset is an instance of zarr.core.Array
+view1 = zview.lazy_slice[1:10:2,:,5:10].lazy_transpose([0,2,1]).lazy_slice[0:3,1:4]
+
+# reading from view on either h5py or zarr
+A = view1[:]          # Brackets on DataSetView call the h5py or zarr slicing method, returning the data
 B = view1.dsetread()  # same as view1[:]
+
+# iterating on either h5yy or zarr
+for ib in view.lazy_iter(axis=1):
+    print(ib[0])
 
 """
 
-import h5py
 import numpy as np
+from abc import ABCMeta, abstractmethod
+from typing import Union
+import h5py
+import zarr
 
-class DatasetView(h5py.Dataset):
+class DatasetView(metaclass=ABCMeta):
 
-    def __init__(self, dataset: h5py.Dataset = None, slice_index=(np.index_exp[:],()), axis_order=None):
+    def __new__(cls, dataset: Union[h5py.Dataset,zarr.core.Array] = None, slice_index=(np.index_exp[:],()), axis_order=None):
         """
         Args:
           dataset:     the underlying dataset
           slice_index: the aggregate slice and int indices after multiple lazy calls
           axis_order: the aggregate axis_order after multiple transpositions
         Returns:
-          lazy object of the view
+          lazy object
         """
-        if dataset is None or isinstance(dataset,h5py.Dataset) is False:
-            raise TypeError("DatasetView requires a h5py.Dataset as positional argument")
+        if cls == DatasetView:
+            if isinstance(dataset,h5py.Dataset):
+                dsetview = DatasetViewh5py(dataset=dataset)
+            elif isinstance(dataset,zarr.core.Array):
+                dsetview = DatasetViewzarr(dataset=dataset)
+            else:
+                raise TypeError("DatasetView requires either an h5py dataset or a zarr array as first argument")
+            return dsetview
         else:
-            h5py.Dataset.__init__(self, dataset.id)
+            return super().__new__(cls)
+
+    def __init__(self, dataset: Union[h5py.Dataset,zarr.core.Array] = None, slice_index=(np.index_exp[:],()), axis_order=None):
+        """
+        Args:
+          dataset:     the underlying dataset
+          slice_index: the aggregate slice and int indices after multiple lazy calls
+          axis_order: the aggregate axis_order after multiple transpositions
+        """
+
         if axis_order is None:
             self._axis_order = tuple(range(len(dataset.shape)))
         else:
@@ -102,7 +133,7 @@ class DatasetView(h5py.Dataset):
         slice_regindices = [slice(*slice_[i].indices(self.dataset.shape[self.axis_order[i]])) if isinstance(slice_[i],slice)
                             else slice_[i]
                             for i in range(len(slice_))]
-        
+
         slice_shape = ()
         int_index = ()
         axis_order = ()
@@ -130,11 +161,11 @@ class DatasetView(h5py.Dataset):
         return slice_shape, slice_regindices, int_index, axis_order
 
     def __getitem__(self, new_slice):
-        """  supports python's colon slicing syntax 
+        """  supports python's colon slicing syntax
         Args:
           new_slice:  the new slice to compose with the lazy instance's self.key slice
         Returns:
-          lazy object of the view
+          lazy object
         """
         key_reinit = self._slice_composition(new_slice)
         if self._lazy_slice_call:
@@ -257,7 +288,7 @@ class DatasetView(h5py.Dataset):
         Args:
           axis_order: permutation order for transpose
         Returns:
-          lazy object of the view
+          lazy object
         """
 
         if axis_order is None:
@@ -333,7 +364,7 @@ class DatasetView(h5py.Dataset):
         self.dataset.read_direct(reversed_dest, source_sel=reversed_slice_key, dest_sel=reversed_dest_sel)
         np.copyto(dest, reversed_dest.transpose(axis_order_read))
 
-def lazy_transpose(dset: h5py.Dataset, axes=None):
+def lazy_transpose(dset: Union[h5py.Dataset,zarr.core.Array], axes=None):
     """ Array lazy transposition, not passing axis argument reverses the order of dimensions
     Args:
       dset: h5py dataset
@@ -345,3 +376,20 @@ def lazy_transpose(dset: h5py.Dataset, axes=None):
         axes = tuple(reversed(range(len(dset.shape))))
 
     return DatasetView(dset).lazy_transpose(axis_order=axes)
+
+class DatasetViewh5py(DatasetView, h5py.Dataset):
+
+    def __new__(cls,dataset):
+
+        _self = super().__new__(cls)
+        h5py.Dataset.__init__(_self, dataset.id)
+        return _self
+
+class DatasetViewzarr(DatasetView, zarr.core.Array):
+
+    def __new__(cls,dataset):
+
+        _self = super().__new__(cls)
+        zarr.core.Array.__init__(_self, dataset.store, path=dataset.path)
+        return _self
+
