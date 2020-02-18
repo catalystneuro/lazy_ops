@@ -1,6 +1,6 @@
 # lazy_ops
 
-<strong>Provides a class to allow for lazy transposing, slicing, and iterating operations on h5py datasets </strong>
+<strong>Lazy transposing and slicing of h5py Datasets</strong>
 
 ## Installation
 
