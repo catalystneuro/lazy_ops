@@ -59,6 +59,7 @@ class DatasetView(metaclass=ABCMeta):
           slice_index: the aggregate slice and int indices after multiple lazy calls
           axis_order: the aggregate axis_order after multiple transpositions
         """
+
         if axis_order is None:
             self._axis_order = tuple(range(len(dataset.shape)))
         else:
@@ -132,7 +133,7 @@ class DatasetView(metaclass=ABCMeta):
         slice_regindices = [slice(*slice_[i].indices(self.dataset.shape[self.axis_order[i]])) if isinstance(slice_[i],slice)
                             else slice_[i]
                             for i in range(len(slice_))]
-        
+
         slice_shape = ()
         int_index = ()
         axis_order = ()
@@ -160,7 +161,7 @@ class DatasetView(metaclass=ABCMeta):
         return slice_shape, slice_regindices, int_index, axis_order
 
     def __getitem__(self, new_slice):
-        """  supports python's colon slicing syntax 
+        """  supports python's colon slicing syntax
         Args:
           new_slice:  the new slice to compose with the lazy instance's self.key slice
         Returns:
