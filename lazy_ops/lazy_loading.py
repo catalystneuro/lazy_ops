@@ -28,11 +28,11 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 from typing import Union
 import h5py
-import zarr
+installed_dataset_types = h5py.Dataset
 
 class DatasetView(metaclass=ABCMeta):
 
-    def __new__(cls, dataset: Union[h5py.Dataset,zarr.core.Array] = None, slice_index=(np.index_exp[:],()), axis_order=None):
+    def __new__(cls, dataset: installed_dataset_types = None, slice_index=(np.index_exp[:],()), axis_order=None):
         """
         Args:
           dataset:     the underlying dataset
@@ -43,16 +43,17 @@ class DatasetView(metaclass=ABCMeta):
         """
         if cls == DatasetView:
             if isinstance(dataset,h5py.Dataset):
-                dsetview = DatasetViewh5py(dataset=dataset)
-            elif isinstance(dataset,zarr.core.Array):
-                dsetview = DatasetViewzarr(dataset=dataset)
-            else:
-                raise TypeError("DatasetView requires either an h5py dataset or a zarr array as first argument")
-            return dsetview
+                return DatasetViewh5py(dataset=dataset)
+            elif HAVE_ZARR:
+                if isinstance(dataset,zarr.core.Array):
+                    return DatasetViewzarr(dataset=dataset)
+            elif str(z1).find("zarr") != -1:
+                raise TypeError("To use DatasetView with a zarr array install zarr: \n pip install zarr\n")
+            raise TypeError("DatasetView requires either an h5py dataset or a zarr array as first argument")
         else:
             return super().__new__(cls)
 
-    def __init__(self, dataset: Union[h5py.Dataset,zarr.core.Array] = None, slice_index=(np.index_exp[:],()), axis_order=None):
+    def __init__(self, dataset: installed_dataset_types = None, slice_index=(np.index_exp[:],()), axis_order=None):
         """
         Args:
           dataset:     the underlying dataset
@@ -364,7 +365,7 @@ class DatasetView(metaclass=ABCMeta):
         self.dataset.read_direct(reversed_dest, source_sel=reversed_slice_key, dest_sel=reversed_dest_sel)
         np.copyto(dest, reversed_dest.transpose(axis_order_read))
 
-def lazy_transpose(dset: Union[h5py.Dataset,zarr.core.Array], axes=None):
+def lazy_transpose(dset: installed_dataset_types, axes=None):
     """ Array lazy transposition, not passing axis argument reverses the order of dimensions
     Args:
       dset: h5py dataset
@@ -385,11 +386,11 @@ class DatasetViewh5py(DatasetView, h5py.Dataset):
         h5py.Dataset.__init__(_self, dataset.id)
         return _self
 
-class DatasetViewzarr(DatasetView, zarr.core.Array):
-
-    def __new__(cls,dataset):
-
-        _self = super().__new__(cls)
-        zarr.core.Array.__init__(_self, dataset.store, path=dataset.path)
-        return _self
-
+try:
+    import zarr
+    from .lazy_loading_zarr import DatasetViewzarr
+    installed_dataset_types = Union[installed_dataset_types,zarr.core.Array]
+    HAVE_ZARR = True
+except ImportError:
+    HAVE_ZARR = False
+    DatasetViewzarr = None

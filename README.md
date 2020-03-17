@@ -1,6 +1,6 @@
 # lazy_ops
 
-<strong>Lazy transposing and slicing of h5py Datasets</strong>
+<strong>Lazy transposing and slicing of h5py Datasets and zarr arrays</strong>
 
 ## Installation
 
