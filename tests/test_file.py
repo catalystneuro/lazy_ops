@@ -82,3 +82,13 @@ def test_func():
 
     os.remove('testfile.hdf5')
 
+
+def test_index_just_first_dim():
+
+    if os.path.isfile('testfile.hdf5'):
+        os.remove('testfile.hdf5')
+    f = h5py.File('testfile.hdf5')
+    dset = f.create_dataset(name='test_dataset', data=np.random.rand(20, 20, 20))
+    dsetview = DatasetView(dset)
+
+    assert_array_equal(dsetview.lazy_slice[[1, 2]], dset[[1, 2]])
