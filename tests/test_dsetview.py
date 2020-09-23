@@ -121,6 +121,10 @@ class LazyOpsBase(object):
         assert_array_equal(self.dset[slices], self.dsetview.lazy_slice[slices])
 
     @dset_iterator
+    def test_partial_slice(self):
+        assert_array_equal(self.dset[[1, 2]], self.dsetview.lazy_slice[[1, 2]])
+
+    @dset_iterator
     def test_dsetview_lazy_slice_lower_dimensions(self):
         for num_slice_dims in range(1, len(self.dset.shape)+1):
             slices = self._slices(self.dset.shape[:num_slice_dims])
