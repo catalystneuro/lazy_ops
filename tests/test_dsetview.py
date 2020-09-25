@@ -121,10 +121,6 @@ class LazyOpsBase(object):
         assert_array_equal(self.dset[slices], self.dsetview.lazy_slice[slices])
 
     @dset_iterator
-    def test_partial_slice(self):
-        assert_array_equal(self.dset[[1, 2]], self.dsetview.lazy_slice[[1, 2]])
-
-    @dset_iterator
     def test_dsetview_lazy_slice_lower_dimensions(self):
         for num_slice_dims in range(1, len(self.dset.shape)+1):
             slices = self._slices(self.dset.shape[:num_slice_dims])
@@ -134,13 +130,23 @@ class LazyOpsBase(object):
             assert_array_equal(self.dset[slices], self.dsetview.lazy_slice[slices])
 
     @dset_iterator
-    def test_dsetview_lazy_slice_int_indexing(self):
-        for num_slice_dims in range(1, len(self.dset.shape)+1):
-            indexing = self._int_indexing(self.dset.shape[:num_slice_dims])
+    def test_dsetview_lazy_slice_full_int_indexing(self):
+        """ tests int indexing of all dims, selecting a single element """
+        indexing = self._int_indexing(self.dset.shape)
+        # test __getitem__ read specifying all dimensions
+        assert_array_equal(self.dset[indexing], self.dsetview[indexing])
+        # test __getitem__ read after lazy_slice for all dimensions
+        # int indexing only
+        assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
+
+    @dset_iterator
+    def test_dsetview_lazy_slice_partial_int_indexing(self):
+        """ tests partial int indexing of lower dimensions """
+        for num_int_dims in range(1, len(self.dset.shape)):
+            indexing = self._int_indexing(self.dset.shape[:num_int_dims])
             # test __getitem__ read specifying lower dimensions
             assert_array_equal(self.dset[indexing], self.dsetview[indexing])
-            # test __getitem__ read after lazy_slice
-            # for lower and all dimensions
+            # test __getitem__ read after lazy_slice for lower dimensions
             # int indexing only
             assert_array_equal(self.dset[indexing], self.dsetview.lazy_slice[indexing])
 
