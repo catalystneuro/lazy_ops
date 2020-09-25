@@ -1,4 +1,7 @@
 # lazy_ops
+[![PyPI version](https://badge.fury.io/py/nwbwidgets.svg)](https://badge.fury.io/py/nwbwidgets)
+[![codecov](https://codecov.io/gh/catalystneuro/lazy_ops/branch/master/graph/badge.svg)](https://codecov.io/gh/catalystneuro/lazy_ops)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 <strong>Lazy transposing and slicing of h5py Datasets and zarr arrays</strong>
 
