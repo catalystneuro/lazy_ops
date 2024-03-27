@@ -178,6 +178,37 @@ class DatasetView(metaclass=ABCMeta):
             return DatasetView(self.dataset, (key_reinit, self._int_index), self.axis_order)
         return DatasetView(self.dataset, (key_reinit, self._int_index), self.axis_order).dsetread()
 
+    def __setitem__(self, new_slice, value):
+        """  supports python's colon slicing syntax for setting values
+        Args:
+          new_slice:  the new slice to compose with the lazy instance's self.key slice
+          value: the value to set
+        """
+        combined_slice = self._slice_composition(new_slice)
+        combined_raw_order = self._reverse_slice(combined_slice)
+        # now check how we deal with the axes order
+        if hasattr(value, 'lazy_transpose'):
+            def transpose(ax_order):
+                return value.lazy_transpose(ax_order).dsetread()
+        elif hasattr(value, 'transpose'):
+            transpose = value.transpose
+        else:
+            # it might be something that can be projected
+            self.dataset[combined_raw_order] = value
+            return
+        # if we reach this point, the value is something we know how to transpose
+        # now we need the order of axes that remain after int indexing
+        live_order = [self.axis_order[i] for i in range(len(self.axis_order))
+                      if not isinstance(combined_slice[i], int)]
+        live_axes = sorted(live_order)
+        live_ordered_axes = [live_axes.index(i) for i in live_order]
+        if sorted(live_ordered_axes) == live_axes:
+            # no need to transpose things after all
+            self.dataset[combined_raw_order] = value
+        else:
+            self.dataset[combined_raw_order] = transpose(live_ordered_axes)
+
+
     def lazy_iter(self, axis=0):
         """ lazy iterator over the first axis
             Modifications to the items are not stored
@@ -189,21 +220,24 @@ class DatasetView(metaclass=ABCMeta):
         """  allows lazy_slice function calls with slice objects as input"""
         return self.__getitem__(new_slice)
 
-    def dsetread(self):
-        """ Returns the data
-        Returns:
-          numpy array
-        """
+    def _reverse_slice(self, lazy_key):
         # Note: Directly calling regionref with slices with a zero dimension does not
         # retain shape information of the other dimensions
         lazy_axis_order = self.axis_order
-        lazy_key = self.key
         for ind in self._int_index:
             lazy_axis_order = lazy_axis_order[:ind[0]] + (ind[2],) + lazy_axis_order[ind[0]:]
             lazy_key = lazy_key[:ind[0]] + (ind[1],) + lazy_key[ind[0]:]
 
         reversed_axis_order = sorted(range(len(lazy_axis_order)), key=lambda i: lazy_axis_order[i])
         reversed_slice_key = tuple(lazy_key[i] for i in reversed_axis_order if i < len(lazy_key))
+        return reversed_slice_key
+
+    def dsetread(self):
+        """ Returns the data
+        Returns:
+          numpy array
+        """
+        reversed_slice_key = self._reverse_slice(self.key)
 
         # this is equivalent to reducing the values in the self.axis_order to account for
         # dimensions dropped by int indexing
