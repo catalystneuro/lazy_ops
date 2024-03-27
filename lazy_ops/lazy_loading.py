@@ -178,6 +178,15 @@ class DatasetView(metaclass=ABCMeta):
             return DatasetView(self.dataset, (key_reinit, self._int_index), self.axis_order)
         return DatasetView(self.dataset, (key_reinit, self._int_index), self.axis_order).dsetread()
 
+    def __setitem__(self, new_slice, value):
+        """  supports python's colon slicing syntax for setting values
+        Args:
+          new_slice:  the new slice to compose with the lazy instance's self.key slice
+          value: the value to set
+        """
+        key_reinit = self._slice_composition(new_slice)
+        self.dataset[key_reinit] = value
+
     def lazy_iter(self, axis=0):
         """ lazy iterator over the first axis
             Modifications to the items are not stored
